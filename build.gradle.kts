@@ -33,6 +33,8 @@ dependencies {
     // OneClient supplies these at runtime; no OneConfig code is bundled in this mod.
     compileOnly(files(fileTree(".reference/oneconfig-beta") { include("*.jar") }).builtBy(prepareOneConfig))
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.20")
+    testImplementation(files(fileTree(".reference/oneconfig-beta") { include("*.jar") }).builtBy(prepareOneConfig))
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.20")
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

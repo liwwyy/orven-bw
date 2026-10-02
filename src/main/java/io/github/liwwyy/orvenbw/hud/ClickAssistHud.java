@@ -11,38 +11,36 @@ import org.polyfrost.oneconfig.api.hud.v1.TextHud;
 
 /** Inherits OneConfig's draggable placement, font, colors, scale, background and profiles. */
 public final class ClickAssistHud extends TextHud {
-    @Dropdown(title = "Button", options = {"Left", "Right", "Both"})
+    @Dropdown(title = "Button", options = {"Active button", "Right", "Both", "Left"})
     public int button = 0;
-    @Text(title = "CPS format", description = "Placeholders: {base}, {boosted}, {total}. Counts cover the last second.")
-    public String format = "{base} + {boosted} = {total}";
+    @Text(title = "CPS format", description = "Placeholders: {base}, {boosted}, {total}, {button}. Counts cover the last second.")
+    public String format = CpsFormat.DEFAULT;
     @Switch(title = "Hide when idle")
     public boolean hideWhenIdle = false;
 
     public ClickAssistHud() {
-        super("orven-bw-clickassist-hud.json", "ClickAssist CPS", Hud.Category.getCOMBAT(), "", " CPS");
+        super("orven-bw-clickassist-hud.json", "ClickAssist CPS", Hud.Category.getCOMBAT(), "", "");
     }
     @Override public long updateFrequency() { return 50_000_000L; }
     @Override protected String getText() {
         if (OrvenBw.instance() == null || HudManager.INSTANCE.isEditing()) {
-            return button == 2 ? "L: " + line(new Cps(7, 6)) + "\nR: " + line(new Cps(5, 3)) : line(new Cps(7, 6));
+            return button == 2 ? line(new Cps(7, 6), 0) + "\n" + line(new Cps(5, 3), 1) : line(new Cps(7, 6), 0);
         }
-        return switch (button) {
-            case 1 -> line(OrvenBw.instance().clickAssist().cps(1));
-            case 2 -> "L: " + line(OrvenBw.instance().clickAssist().cps(0)) + "\nR: " + line(OrvenBw.instance().clickAssist().cps(1));
-            default -> line(OrvenBw.instance().clickAssist().cps(0));
-        };
+        var feature = OrvenBw.instance().clickAssist();
+        if (button == 2) return line(feature.cps(0), 0) + "\n" + line(feature.cps(1), 1);
+        int selected = button == 1 ? 1 : button == 3 ? 0 : feature.activeButton();
+        return line(feature.cps(selected), selected);
     }
     @Override public boolean shouldShow() {
         if (HudManager.INSTANCE.isEditing()) return true;
         OrvenBw mod = OrvenBw.instance();
-        if (mod == null || !mod.config().showHud) return false;
-        return !hideWhenIdle || (button != 1 && mod.clickAssist().cps(0).total() > 0)
-                || (button != 0 && mod.clickAssist().cps(1).total() > 0);
+        if (mod == null || !mod.config().showHud || !mod.config().modEnabled) return false;
+        if (!hideWhenIdle) return true;
+        int selected = button == 1 ? 1 : button == 3 ? 0 : mod.clickAssist().activeButton();
+        return mod.clickAssist().cps(selected).total() > 0 || button == 2 && mod.clickAssist().cps(1 - selected).total() > 0;
     }
-    private String line(Cps cps) {
-        String template = format == null ? "{base} + {boosted} = {total}" : format;
-        return template.replace("{base}", Integer.toString(cps.base()))
-                .replace("{boosted}", Integer.toString(cps.boosted()))
-                .replace("{total}", Integer.toString(cps.total()));
+    @Override public String concat(String prefix, String value, String suffix) {
+        return super.concat(prefix, value, CpsFormat.suffix(suffix));
     }
+    private String line(Cps cps, int selected) { return CpsFormat.render(format, cps, selected); }
 }

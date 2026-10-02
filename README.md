@@ -1,105 +1,97 @@
 # orven-bw
 
-A modular client utility mod for **Minecraft 1.8.9, Ornithe Gen 2, and OneConfig v1**.
-Maintained by **liwwyy**. This first release adds ClickAssist and a customizable CPS HUD.
+**Bedwars/PvP utils to lower your cortisol!** Maintained by **liwwyy**.
+A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Use
 
-Copy `build/libs/orven-bw-0.1.0+mc1.8.9.jar` into the OneClient instance's `minecraft/mods`
-folder. The source jar is for development and should not be installed.
+Install `build/libs/orven-bw-0.1.0+mc1.8.9.jar` in the OneClient instance's
+`minecraft/mods` folder. Do not install the sources jar.
 
-In OneConfig, open **orven-bw → ClickAssist** and enable assistance. It starts disabled.
-The HUD can be added through OneConfig's HUD editor under **orven-bw / ClickAssist CPS**.
-It inherits native placement, scale, font, colors, background, prefix/suffix, and profiles.
-Choose left, right, or both buttons and optionally hide it when idle. Its editable format is:
+Press **P** to open this mod's OneConfig page. The hotkey is configurable in General
+and works when the mod is disabled. General comes first, followed by ClickAssist.
+Each section has its enable switch embedded in the accordion header; settings start
+collapsed. Physical ClickAssist, Spam Clicking and Button Hold enable independently.
+The General mod switch and optional scoreboard filter govern all three.
+
+- **General:** mod switch, settings hotkey, and optional sidebar text filter. The
+  default matching text is `Red`; case and formatting are ignored.
+- **Physical Assist:** boost manual clicking above 4 CPS. Controls include left/right
+  assistance, items, entity targeting, a player within four blocks, creative mode,
+  and initial boost delay. Preserve block breaking defaults to off.
+- **Spam Clicking:** hold middle mouse by default, or select Toggle. Choose left/right
+  output and configure this feature's own filters, weapons, rates and exhaustion.
+  Click through blocks defaults to on; turn it off to pause left spam on blocks.
+- **Button Hold:** separate unassigned left/right toggle binds hold the configured
+  attack/use binding until toggled off. Vanilla handles mining and item use.
+- **HUD:** visibility switch and shortcut to OneConfig's HUD editor.
+
+## CPS profiles
+
+Physical assistance and spam have independent decimal settings, with these defaults:
+
+| Level | CPS | Share of steady-session time |
+| --- | ---: | ---: |
+| High | 14.0 | 20% |
+| Medium | 12.5 | 40% |
+| Low | 9.5 | 40% |
+
+Each session ramps toward the high level over **one second**, then varies through
+shuffled one-second levels with short smooth transitions. Interval variation is enabled
+by default and applies to both Hold and Toggle spam. The old hard cap and boost-chance
+controls have been replaced by these profiles.
+
+Physical assistance estimates cadence during warm-up, so it need not wait for five
+presses to fill the one-second counter. Once eligible, it starts with a positive boost
+and gradually supplies the difference between your manual rate and the selected total
+rate. It can generate more than one extra click per manual press. Stopping manual input
+ends assistance; generated clicks cannot activate it.
+
+Each feature has its own exhaustion controls: by default, after eight seconds, check
+every four seconds with a 30% chance to slow toward 8–9 CPS for 600 ms.
+
+Rates are targets, not a hard limit on manual input. Physical clicks are preserved.
+Vanilla's 20 Hz tick loop limits dispatch precision; missed clicks are not replayed after
+stalls. Item-use rules and server interactions still apply. Native held-use repeats and
+input from other mods are not included in this mod's generated-click counter.
+
+## HUD
+
+Add **ClickAssist CPS** through OneConfig's HUD editor. It follows the last boosted
+button by default; left, right and both displays are also available. Default output:
 
 ```text
-{base} + {boosted} = {total}
+7 + 6 = 13 R-Cps
 ```
 
-The default text displays `7 + 6 = 13 CPS`, for example. All three values use a rolling
-one-second window. Base CPS counts real presses of the configured attack/use bindings,
-including remapped mouse buttons or keyboard keys, excluding keyboard repeat events.
-Boosted CPS counts extra keybinding clicks actually queued by this mod. Neither counter
-claims successful hits or block placements; vanilla/server interaction rules still apply.
+Editable placeholders are `{base}`, `{boosted}`, `{total}` and `{button}`. These are
+rolling one-second click counts, so they remain integers even though target settings
+support decimals. The HUD window naturally lags changes to the current target rate.
+Native placement, scale, font, colors, background, prefix/suffix and profiles remain
+customizable. Old default formats and the old ` CPS` suffix are handled automatically.
 
-## ClickAssist settings
-
-| Setting | Default | Behavior |
-| --- | --- | --- |
-| Enabled | Off | Master feature switch |
-| Total CPS cap | 13 | Per-button physical + assisted CPS budget |
-| Activation CPS | 4 | Boost only when physical CPS is **strictly greater** than this |
-| Requires player within reach | Off | Another living non-spectator player within a four-block sphere |
-| Disable in creative | On | No assistance in creative mode |
-| Left click / chance | On / 80% | At most one extra click for an eligible physical press |
-| Weapon only | On | Swords and sticks by default; axes, rods, hoes and shovels are opt-in |
-| Only while targeting an entity | Off | Requires an entity under the crosshair |
-| Preserve block breaking | On | No extra attack clicks when targeting a block |
-| Right click / chance | Off / 80% | Independent assisted use-click channel |
-| Blocks only | On | Right assistance requires holding a block |
-| Boost delay | 40 ms | Tick-dispatched delay; slider 10–150 ms |
-| Vary boost timing | On | Up to ±25% delay variation |
-| Show HUD | On | Gate for the independently editable HUD |
-
-The activation threshold applies separately to both channels and replaces Raven-bS's
-fixed optional right-click “Above 5 cps” setting. A nearby player need not be under the
-crosshair. Spectators and dead players do not qualify; self never qualifies.
-
-Menus, unfocus, pausing, world/player replacement, and keybinding changes clear the
-histories and pending work. Assistance pauses while using an item, when dead, or when
-spectating. It never simulates OS mouse input, overwrites held-key state, removes vanilla
-hit delays, or clicks inventory slots. Holding a button alone never creates more boosts.
-Queued clicks older than 250 ms are discarded instead of replayed after a stall.
-
-The cap limits **added clicks**. Physical clicks are always preserved, so a burst of manual
-input can exceed the configured total; the mod then adds no more clicks. Native held-use
-repeats and clicks from other mods are not counted in this mod's physical/boosted HUD.
-The vanilla 20 Hz input loop bounds timing precision and dispatches at most one extra
-click per button per tick.
+Menus, unfocus, pausing, world/player changes, rebinding, profile changes and disabled
+global gates clear active automation. Held state is released or restored to real input.
+Generated clicks use Minecraft's vanilla keybinding queue; button hold uses its held
+binding state. No OS mouse events or inventory clicks are generated.
 
 ## Build
 
-The build uses **Gradle 9.8.0**, **JDK 27**, **Loom 1.18.2**, **Ploceus 1.18.1**,
-**Fabric Loader 0.19.5**, and **Feather Gen 2 1.8.9+build.2**. Java output targets **25**,
-matching the supplied OneClient beta runtime. A JDK 27 installation must be available to
-Gradle; the local installations are declared in `gradle.properties`.
-
-OneClient supplies OneConfig **1.2.9**. This beta is not published in Polyfrost's public
-Maven repository (the latest listed Ornithe artifact during setup was 1.2.7). The build
-extracts the exact compile-only API jars from the installed beta into the ignored
-`.reference/oneconfig-beta/` directory. Those dependencies are never bundled or copied
-back into your modpack. Python 3 is used only for this extraction step.
+Gradle 9.8.0, JDK 27, Loom 1.18.2, Ploceus 1.18.1, Loader 0.19.5 and Feather Gen 2
+1.8.9+build.2 are configured. Output targets Java 25, matching the supplied beta runtime.
+OneConfig 1.2.9 APIs are extracted from the installed beta for compilation and tests;
+OneClient supplies them at runtime. Dependencies are not bundled in the mod.
 
 ```sh
 JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
-For a different installation location:
+If the local sandbox prevents Gradle from starting, use the already populated cache:
 
 ```sh
-JAVA_HOME=/path/to/jdk-27 ./gradlew build \
-  -PoneconfigJar='/path/to/OneConfig-1.8.9-ornithe-1.2.9.jar'
+python3 scripts/build-cached.py
 ```
 
-Required runtime: Minecraft 1.8.9, Ornithe Gen 2 / Fabric Loader ≥0.19.5, Java ≥25,
-OneConfig v1 ≥1.2.9, and Fabric Language Kotlin ≥1.14.1+kotlin.2.4.20.
-The beta pack already supplies these and Compose through OneConfig's dependencies.
-No Fabric API or OSL module is required by this implementation.
-
-## Development
-
-`feature/FeatureRegistry` owns feature lifecycle and input routing. Future utilities implement
-`ClientFeature`, register with the registry, and get their own OneConfig category. ClickAssist's
-scheduler is independent of Minecraft and has deterministic tests for activation, caps,
-probability, timing, expiration, stall recovery, channel isolation and resets.
-
-```sh
-JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew test
-```
-
-Raven-bS was cloned into `raven-Bs/` for reference and is ignored by Git. Other reference
-repositories and local beta APIs are also ignored. ClickAssist and AutoClicker were reviewed
-for behavior; the mod implementation is original and does not include Raven-bS code.
-A standalone AutoClicker and the remaining Raven-bS modules are future features.
-See [research notes](docs/research.md) and [validation notes](docs/validation.md).
+The fallback runs the tests and uses Tiny Remapper's MixinExtension to build an
+intermediary jar. It requires the prior Gradle/Loom caches and the installed beta jar.
+See [validation notes](docs/validation.md) and [source research](docs/research.md).

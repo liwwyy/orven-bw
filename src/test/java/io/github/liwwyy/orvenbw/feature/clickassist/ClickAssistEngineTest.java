@@ -4,94 +4,93 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClickAssistEngineTest {
-    private final ClickAssistEngine engine = new ClickAssistEngine(() -> 0.0);
-    private final ClickAssistEngine.Options defaults = new ClickAssistEngine.Options(4, 13, 100, 40_000_000L, false);
     private static final long MS = 1_000_000L;
-
-    @Test void activatesStrictlyAboveFourPhysicalClicksAndWaitsForDelay() {
-        for (int i = 0; i < 4; i++) engine.physicalClick(0, i * 100 * MS, defaults, true);
-        assertFalse(engine.pollBoost(0, 350 * MS, defaults, true));
-        engine.physicalClick(0, 400 * MS, defaults, true);
-        assertFalse(engine.pollBoost(0, 439 * MS, defaults, true));
-        assertTrue(engine.pollBoost(0, 440 * MS, defaults, true));
-        assertEquals(new ClickAssistEngine.Cps(5, 1), engine.cps(0, 440 * MS));
-        assertFalse(engine.pollBoost(0, 500 * MS, defaults, true));
+    @Test void warmupUsesCadenceBeforeAFullSecondOfPresses() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        engine.physicalClick(0, 0);
+        assertFalse(engine.manuallyActive(0, 0, 4));
+        engine.physicalClick(0, 200 * MS);
+        assertTrue(engine.manuallyActive(0, 200 * MS, 4));
+        assertEquals(5, engine.manualRate(0, 200 * MS), 1e-9);
+        assertFalse(engine.manuallyActive(0, 601 * MS, 4));
+        var threshold = new ClickAssistEngine(() -> 0.5);
+        threshold.physicalClick(0, 0); threshold.physicalClick(0, 250 * MS);
+        assertFalse(threshold.manuallyActive(0, 250 * MS, 4));
     }
-
-    @Test void holdsRollingCapWithoutSuppressingPhysicalInput() {
-        var options = new ClickAssistEngine.Options(0, 13, 100, 10 * MS, false);
-        for (int i = 0; i < 30; i++) {
-            long now = i * 20 * MS;
-            engine.physicalClick(0, now, options, true);
-            int before = engine.cps(0, now + 10 * MS).total();
-            if (engine.pollBoost(0, now + 10 * MS, options, true)) assertTrue(before < 13);
+    @Test void decimalTargetsProduceTheirLongTermRatesOnTwentyHzTicks() {
+        for (double rate : new double[]{8, 9.5, 12.5, 14}) {
+            var engine = new ClickAssistEngine(() -> 0.5);
+            int count = 0;
+            for (long t = 0; t < 20_000 * MS; t += 50 * MS)
+                if (engine.poll(1, t, rate, true, false, 0)) count++;
+            assertEquals(rate, count / 20.0, 0.1);
+            assertEquals(0, engine.cps(0, 20_000 * MS).total());
         }
-        assertEquals(30, engine.cps(0, 610 * MS).base());
-        assertTrue(engine.cps(0, 610 * MS).boosted() <= 6);
-        assertFalse(engine.pollBoost(0, 610 * MS, options, true));
     }
-
-    @Test void pendingBudgetPreventsOverQueueingAndRechecksLoweredCap() {
-        var high = new ClickAssistEngine.Options(0, 4, 100, 40 * MS, false);
-        engine.physicalClick(0, 0, high, true);
-        engine.physicalClick(0, MS, high, true);
-        engine.physicalClick(0, 2 * MS, high, true);
-        var lowered = new ClickAssistEngine.Options(0, 3, 100, 40 * MS, false);
-        assertFalse(engine.pollBoost(0, 50 * MS, lowered, true));
-        assertEquals(0, engine.cps(0, 50 * MS).boosted());
+    @Test void changingRateDoesNotWaitForOldRollingCountsToExpire() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        for (long t = 0; t < 1000 * MS; t += 50 * MS) engine.poll(0, t, 14, true, false, 0);
+        int count = 0;
+        for (long t = 1000 * MS; t < 2000 * MS; t += 50 * MS)
+            if (engine.poll(0, t, 9.5, true, false, 0)) count++;
+        assertTrue(count >= 9 && count <= 10, "Rate change should pace, not freeze: " + count);
     }
-
-    @Test void physicalAndBoostedCountsExpireAtOneSecond() {
-        var opt = new ClickAssistEngine.Options(0, 13, 100, 10 * MS, false);
-        engine.physicalClick(0, 0, opt, true);
-        assertTrue(engine.pollBoost(0, 10 * MS, opt, true));
+    @Test void firstBoostWaitsOnlyForConfiguredInitialDelay() {
+        var engine = new ClickAssistEngine(() -> 0.99);
+        assertFalse(engine.poll(0, 0, 1, true, true, 40 * MS));
+        assertFalse(engine.poll(0, 39 * MS, 1, true, true, 40 * MS));
+        assertTrue(engine.poll(0, 40 * MS, 1, true, true, 40 * MS));
+    }
+    @Test void staleWorkAndDisabledInputAreNeverReplayed() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        assertTrue(engine.poll(0, 0, 14, true, false, 0));
+        assertFalse(engine.poll(0, 500 * MS, 14, true, false, 0));
+        assertFalse(engine.poll(0, 550 * MS, 14, true, false, 0));
+        assertTrue(engine.poll(0, 600 * MS, 14, true, false, 0));
+        assertFalse(engine.poll(0, 650 * MS, 14, false, false, 0));
+        assertFalse(engine.poll(0, 700 * MS, 14, true, false, 40 * MS));
+    }
+    @Test void physicalAndGeneratedCountsExpireAndResetIndependently() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        engine.physicalClick(0, 0);
+        assertTrue(engine.poll(0, 10 * MS, 5, true, false, 0));
         assertEquals(new ClickAssistEngine.Cps(0, 1), engine.cps(0, 1000 * MS));
         assertEquals(new ClickAssistEngine.Cps(0, 0), engine.cps(0, 1010 * MS));
+        engine.physicalClick(1, 1100 * MS); engine.reset();
+        assertEquals(0, engine.cps(1, 1100 * MS).total());
+        assertFalse(engine.manuallyActive(1, 1100 * MS, 0));
     }
-
-    @Test void losingEligibilityCancelsPendingAndDoesNotReplayOnReentry() {
-        var opt = new ClickAssistEngine.Options(0, 13, 100, 40 * MS, false);
-        engine.physicalClick(0, 0, opt, true);
-        assertFalse(engine.pollBoost(0, 20 * MS, opt, false));
-        assertFalse(engine.pollBoost(0, 50 * MS, opt, true));
-        engine.physicalClick(0, 100 * MS, opt, false);
-        assertFalse(engine.pollBoost(0, 150 * MS, opt, true));
+    @Test void targetAssistanceCanSupplyMoreThanOneBoostPerPhysicalPress() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        int generated = 0;
+        for (long t = 0; t < 10_000 * MS; t += 50 * MS) {
+            if (t % (200 * MS) == 0) engine.physicalClick(0, t);
+            boolean active = engine.manuallyActive(0, t, 4);
+            if (engine.poll(0, t, 14 - engine.manualRate(0, t), active, false, 0)) generated++;
+        }
+        assertTrue(generated > 50, "Must exceed the former one-extra-per-press limit");
+        assertEquals(5, engine.cps(0, 9950 * MS).base());
+        assertEquals(14, engine.cps(0, 9950 * MS).total(), 1);
     }
-
-    @Test void longStallDropsBoostsInsteadOfBursting() {
-        var opt = new ClickAssistEngine.Options(0, 30, 100, 40 * MS, false);
-        for (int i = 0; i < 8; i++) engine.physicalClick(0, i * MS, opt, true);
-        assertFalse(engine.pollBoost(0, 300 * MS, opt, true));
-        assertEquals(0, engine.cps(0, 300 * MS).boosted());
+    @Test void timingVariationAppliesToTheSpamScheduler() {
+        int[] index = {0}; double[] draws = {0, 0.95, 0.3, 0.9};
+        var varied = new ClickAssistEngine(() -> draws[index[0]++ % draws.length]);
+        var fixed = new ClickAssistEngine(() -> 0.5);
+        StringBuilder a = new StringBuilder(), b = new StringBuilder();
+        for (long t = 0; t < 5000 * MS; t += 50 * MS) {
+            a.append(varied.poll(0, t, 12.5, true, true, 0) ? '1' : '0');
+            b.append(fixed.poll(0, t, 12.5, true, false, 0) ? '1' : '0');
+        }
+        assertNotEquals(a.toString(), b.toString());
     }
-
-    @Test void zeroChanceNeverQueuesAndProbabilityBoundaryIsExclusive() {
-        var zero = new ClickAssistEngine.Options(0, 13, 0, 10 * MS, false);
-        engine.physicalClick(0, 0, zero, true);
-        assertFalse(engine.pollBoost(0, 20 * MS, zero, true));
-        var boundary = new ClickAssistEngine(() -> 0.8);
-        var eighty = new ClickAssistEngine.Options(0, 13, 80, 10 * MS, false);
-        boundary.physicalClick(0, 0, eighty, true);
-        assertFalse(boundary.pollBoost(0, 20 * MS, eighty, true));
-    }
-
-    @Test void channelsAreIndependentAndResetClearsBoth() {
-        var opt = new ClickAssistEngine.Options(0, 13, 100, 10 * MS, false);
-        engine.physicalClick(0, 0, opt, true);
-        assertTrue(engine.pollBoost(0, 20 * MS, opt, true));
-        assertFalse(engine.pollBoost(1, 20 * MS, opt, true));
-        assertEquals(0, engine.cps(1, 20 * MS).total());
-        engine.physicalClick(1, 30 * MS, opt, true);
-        engine.reset();
-        assertEquals(0, engine.cps(0, 40 * MS).total());
-        assertEquals(0, engine.cps(1, 40 * MS).total());
-        assertFalse(engine.pollBoost(1, 50 * MS, opt, true));
-    }
-
-    @Test void assistanceNeverRunsWithoutNewPhysicalInput() {
-        var opt = new ClickAssistEngine.Options(0, 13, 100, 10 * MS, false);
-        engine.physicalClick(0, 0, opt, true);
-        assertTrue(engine.pollBoost(0, 20 * MS, opt, true));
-        for (long t = 50; t < 2000; t += 50) assertFalse(engine.pollBoost(0, t * MS, opt, true));
+    @Test void resumedManualClickingGetsTheSameFastWarmupAsTheFirstSession() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        engine.physicalClick(0, 0); engine.physicalClick(0, 200 * MS);
+        assertTrue(engine.manuallyActive(0, 200 * MS, 4));
+        engine.physicalClick(0, 3000 * MS);
+        assertFalse(engine.manuallyActive(0, 3000 * MS, 4));
+        engine.physicalClick(0, 3200 * MS);
+        assertTrue(engine.manuallyActive(0, 3200 * MS, 4));
+        assertEquals(5, engine.manualRate(0, 3200 * MS));
     }
 }

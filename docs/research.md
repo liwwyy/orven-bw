@@ -46,3 +46,62 @@ Inspected reference commits:
 - PolySprint legacy: `97c9a8007fd3e80f1c3e1b615774168833496ca3`
 - EvergreenHUD legacy: `11d6a6021727ca5ab868b43929ac08c5cae87553`
 - OneConfig source: `a7a541eef0855a636ccda32c279a0693e72968a5` (beta bytecode is authoritative)
+
+
+## Settings and new input modes (2026-10-02)
+
+Inspected the legacy branches of [BehindYouV3](https://github.com/Polyfrost/BehindYouV3/blob/legacy/src/main/kotlin/org/polyfrost/behindyou/client/BehindYouConfig.kt)
+and [OverflowAnimationsV2](https://github.com/Polyfrost/OverflowAnimationsV2/tree/legacy).
+BehindYou uses OneConfig accordion trees, an always-visible master switch, native
+keybinds and RadioButton controls. Overflow uses category metadata on properties to
+create tabs. Our layout uses category metadata plus native accordion trees, with
+`collapsed=true`, supported in the installed OneConfig 1.2.9 ConfigScreen bytecode.
+Hidden flat aliases retain existing config values and share fields with the new controls.
+DeepWiki was consulted for OneConfig controls/keybinds; source and installed SDK checks
+were used to verify the actual implementation.
+
+Raven-bS ClickAssist's left/right paths call AWT Robot mouseRelease/mousePress with
+button masks 16/4 and ignore their synthetic mouse events. Raven AutoClicker calls
+KeyBinding.onTick and ReflectionUtils.setButton. Feather Gen 2 names the vanilla queue
+method KeyBinding.click; its held-state setter is KeyBinding.set. Our generated clicks
+use that queue; button hold uses that setter without modifying OS/LWJGL mouse state.
+This is **not the exact Raven ClickAssist input method**. No comparison can establish
+that a server will accept automated input. The rate envelope is a configurable pacing
+feature, not an anti-cheat guarantee.
+
+The scoreboard gate follows vanilla GameGui's team-color sidebar slot (3 + color id),
+falling back to slot 1. It checks the displayed title and last fifteen non-hidden scores,
+including team prefixes/suffixes, strips formatting and matches a case-insensitive
+substring. Empty text or no sidebar never matches. The mapping MCP verified Scoreboard
+and Team method names; generated Feather source verified vanilla sidebar selection.
+
+## Weighted profile redesign (2026-10-02)
+
+The new layout constructs General first, before hidden compatibility aliases. This
+matters because OneConfig's `buildCategories` uses insertion order even when earlier
+properties are hidden. Each native accordion starts with a boolean property without
+a visualizer, which `buildAccordionNode` recognizes as its embedded header switch.
+Physical Assist, Spam Clicking, Button Hold and HUD follow under the ClickAssist tab.
+
+The installed `1.8.9-ornithe-1.2.9.jar` was inspected with javap. Its keyboard event
+mixin converts LWJGL codes through `KeyCodes.fromLegacy` before dispatching OneConfig
+key events. `InputConstants.KEY_P` is SDL code 19, not LWJGL code 25 or GLFW code 80.
+The middle mouse constant is 2. The new settings binding uses those actual installed
+constants. `OneConfigUI.open(new ModConfigRoute("orven-bw.json", "General"))` opens the
+mod page, and `HudManager.openEditor()` opens the native HUD editor.
+
+Physical and spam rate profiles independently select 14 / 12.5 / 9.5 CPS with steady
+slot weights 20 / 40 / 40 percent. A shuffled five-slot bag fixes those proportions;
+150 ms interpolation avoids jumps. Both hold-spam and toggle-spam call the same
+fractional-credit scheduler, with optional ±15% interval-weight variation. Warm-up uses
+manual cadence; regular counting and freshness checks prevent synthetic self-activation
+and continuation after manual clicking stops. The old one-extra-per-press rule and
+rolling hard cap have been removed. This materially changes physical-assist behavior.
+
+The one-time config migration copies previous timing/exhaustion/item filters into the
+new independent controls, changes the previous default 1200 ms ramp to 1000 ms, and
+preserves nondefault ramp durations, binds and other saved gates. The new tier values
+start at the requested defaults. Existing explicit Preserve block breaking values
+remain; new configs and the control's reset default are off. Old cap/chance keys remain
+hidden for compatibility and no longer affect scheduling. HUD format compatibility
+moves the letter behind the total and suppresses the old redundant CPS suffix.

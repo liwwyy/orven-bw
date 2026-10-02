@@ -62,3 +62,71 @@ in a world. Verify creative/weapon/target/block gates, a second player at four b
 right-click assistance, remapped bindings, and resets on menus and world changes.
 Expected HUD behavior: base CPS remains independent of generated clicks; both
 histories expire after one second; holding alone never boosts.
+
+
+## Improvements validation (2026-10-02)
+
+The current sandbox prohibits writes to ~/.gradle and blocks local sockets, so Gradle's
+FileLockContentionHandler fails before configuring the project. The normal build was
+attempted, including an offline project-local cache; neither could start under this
+restriction. No permissions were bypassed.
+
+`python3 scripts/build-cached.py` compiles main/tests with JDK 27 targeting Java 25,
+runs JUnit through its launcher, packages resources, and remaps named → intermediary
+with cached Tiny Remapper 0.14.1 and its MixinExtension. It requires the previously
+populated Gradle/Loom caches. The jar records Calamus generation 2 and intermediary
+namespace. No OneConfig dependency is bundled. The usual Gradle build remains the
+supported build outside the restricted environment.
+
+18 tests pass: physical vs generated counts, independent buttons, cap and probability,
+activation threshold, dropped stale work, reset behavior, spam without manual CPS,
+no stall catch-up, 8/9/13 CPS pacing on a simulated 20 Hz loop, gradual ramp/reset,
+exhaustion timing/cap, scoreboard formatting/empty cases, native config tab/group
+metadata, collapsed defaults, header switches and legacy field aliases.
+
+The installed OneConfig 1.2.9 internal jar contains support for the `collapsed` metadata.
+A direct config-tree probe verifies ten collapsed groups and working UI property
+setters against the exact installed APIs. Remapped injector annotations were compared
+with the previous Loom-built jar: all four tick method/target names and ordinals match.
+The bytecode differs in compiler/debug details, so byte-for-byte identity is not claimed.
+The description in the built fabric.mod.json matches the requested text exactly.
+
+The previous isolated startup result above applies to the prior version. The new GUI
+and gameplay modes have not been exercised in a real game here. Remaining checks in
+the OneClient instance: General/ClickAssist tabs and collapsed groups; middle-button
+hold and toggle spam; left/right hold toggles; right active-button HUD; ramp/exhaustion;
+scoreboard title/team-prefix matching; release on menus, unfocus, world/profile changes,
+rebinding and disabled gates. Existing graphics restrictions prevent full visual testing.
+
+The current environment also exposes .git as read-only, so these improvements cannot
+be committed from this session. The pre-existing user edit to .gitignore was preserved.
+
+## Weighted-profile build (latest, 2026-10-02)
+
+`python3 scripts/build-cached.py` compiles with JDK 27 targeting Java 25 and runs
+24 tests against the cached libraries, including the exact OneConfig 1.2.9 SDK.
+The tests cover General-first ordering, five collapsed accordions with embedded header
+switches, correct SDL P/middle defaults, independent controls, legacy aliases and
+migration; 9.5/12.5 decimal pacing on a 20 Hz loop; early and resumed manual warm-up;
+strict activation; initial delay; generation beyond one extra per manual press; rate
+changes without a rolling-cap freeze; timing variation; expiry, reset and dropped stall
+work; one-second fractional ramp; weighted slots, smooth transitions and exhaustion;
+scoreboard matching; block bypass; and default/custom/legacy HUD formatting.
+
+A clock-jump test initially exposed a stale transition source after jumping several
+levels. The session now blends only from the adjacent previous slot; skipped slots
+settle to their selected target. Review also caught stale warm-up timing after a long
+manual pause; resumed sessions now restart cadence detection from their new presses.
+
+The normal Gradle launcher remains restricted by the current sandbox's read-only
+~/.gradle directory/local socket limitations, so the cached build remains necessary.
+The final jar is checked for Java 25 class versions, Calamus generation 2, intermediary
+namespace, unchanged mapped injector targets and absence of bundled dependency jars.
+
+Real-client GUI/input checks remain outstanding. In the real beta instance, verify P
+with the mod off, embedded switches and ordering, independent feature activation,
+Hold/Toggle spam variation, decimal rate profiles, ramps after resuming, block bypass,
+left/right button hold, both HUD lines and profile/context cleanup. The earlier isolated
+startup test was for the original implementation, not this redesign; the SDL graphics
+failure described above prevented full game testing. .git remains read-only in this
+session, so changes cannot be committed here; the user's .gitignore edit is preserved.

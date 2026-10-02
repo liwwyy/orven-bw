@@ -21,7 +21,12 @@ public final class OrvenBw implements ClientModInitializer {
         config.preload();
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);
+        org.polyfrost.oneconfig.api.config.v1.ConfigManager.addProfileChangeListener(name -> { clickAssist.reset(); config.migrate(); });
         instance = this;
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.settingsBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.spamBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdLeftBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdRightBind);
         HudManager.register(new ClickAssistHud(), "orven-bw.json", "combat");
         LOGGER.info("orven-bw initialized (maintainer: liwwyy, Feather Gen 2 build 2)");
     }

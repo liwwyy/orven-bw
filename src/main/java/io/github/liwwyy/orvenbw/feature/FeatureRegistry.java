@@ -19,7 +19,7 @@ public final class FeatureRegistry {
         if (syncContext(client)) for (ClientFeature f : features) f.beforeInteractions(client);
     }
     private boolean syncContext(Minecraft client) {
-        boolean ready = client.world != null && client.player != null && client.screen == null && client.focused && !client.isPaused();
+        boolean ready = (io.github.liwwyy.orvenbw.OrvenBw.instance() == null || ScoreboardGate.allows(client, io.github.liwwyy.orvenbw.OrvenBw.instance().config())) && client.world != null && client.player != null && client.screen == null && client.focused && !client.isPaused();
         if (!ready || world != client.world || player != client.player) {
             if (active || world != client.world || player != client.player) for (ClientFeature f : features) f.reset();
         }

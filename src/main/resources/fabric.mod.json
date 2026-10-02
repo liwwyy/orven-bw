@@ -3,7 +3,7 @@
   "id": "orven-bw",
   "version": "${version}",
   "name": "orven-bw",
-  "description": "A modular collection of Minecraft 1.8.9 utilities for OneClient. Starts with ClickAssist and its CPS HUD.",
+  "description": "Bedwars/PvP utils to lower your cortisol!",
   "authors": ["liwwyy"],
   "environment": "client",
   "entrypoints": {"client": ["io.github.liwwyy.orvenbw.OrvenBw"]},

@@ -105,3 +105,31 @@ start at the requested defaults. Existing explicit Preserve block breaking value
 remain; new configs and the control's reset default are off. Old cap/chance keys remain
 hidden for compatibility and no longer affect scheduling. HUD format compatibility
 moves the letter behind the total and suppresses the old redundant CPS suffix.
+
+
+## Held-click trigger and smaller accordions (2026-10-02)
+
+Asked [DeepWiki about organizing the current OneConfig beta UI](https://deepwiki.com/search/we-use-oneconfig-v1-beta-129-o_6a15e88c-5dbe-4f3b-a74b-c7a4ff25a229),
+then checked the actual OneConfig source and cached 1.2.9 SDK. DeepWiki recommended
+categories/subcategories, smaller accordions and dependent controls. Its suggestion
+of nested accordions is unsuitable here: `SettingIndex.buildAccordionNode` collects
+only immediate Property children. The implementation uses sibling trees, two categories
+(General first, ClickAssist), and four feature subcategories. `ConfigScreen.AccordionRow`
+supports `collapsed=true` with a visible boolean header; `Property.addDisplayCondition`
+provides reactive hiding. No unsupported full-width metadata or custom visualizer is used.
+
+Feather MCP verified `ClientPlayNetworkHandler.getOnlinePlayers`. Named Minecraft source
+confirms `Minecraft.getNetworkHandler`, `PlayerInfo.getProfile().getName`, and player
+usernames. Nearby detection compares names to tab-list profiles, excludes self/dead/
+spectators and uses squared distance <=16. Missing network information fails closed.
+This is the user-selected NPC rule: listed player-shaped NPCs can still qualify.
+
+Held Click polls existing LWJGL physical input for the current attack/use bindings;
+Button Hold modifies KeyBinding state only and cannot start that timer. Timers require
+continuous eligibility. The optional instant bypass requires entity + sword/stick +
+nearby player regardless of disabled optional filters. It skips only the hold delay.
+Vanilla item-use is preserved: the generated queue pauses while `hasItemInUse()` is true.
+Both spam triggers use the same timing/profile implementation with one source per side.
+
+Schema 3 retains field-sharing hidden root aliases, so prior bindings and profile values
+survive the tree reorganization. Schema 2 advances without rerunning legacy migration.

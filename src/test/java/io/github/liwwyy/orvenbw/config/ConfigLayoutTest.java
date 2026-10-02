@@ -30,11 +30,11 @@ class ConfigLayoutTest {
     }
     @Test void featureControlsAndLegacyAliasesShareOnlyTheirOwnValues() throws Exception {
         var config = new OrvenConfig(); Tree tree = tree(config);
-        tree.getProp("assist", "assistMediumCps").setAs(11.7);
+        tree.getProp("assistRates", "assistMediumCps").setAs(11.7);
         assertEquals(11.7, config.assistMediumCps);
         assertEquals(12.5, config.spamMediumCps);
         tree.getProp("spamMediumCps").setAs(10.2);
-        assertEquals(10.2, (double) tree.getProp("spam", "spamMediumCps").getAs());
+        assertEquals(10.2, (double) tree.getProp("spamRates", "spamMediumCps").getAs());
         assertEquals(true, tree.get("leftChance").getMetadata("hidden"));
         assertNull(tree.get("assist", "leftChance"));
         assertNull(tree.get("assist", "totalCpsCap"));
@@ -47,6 +47,56 @@ class ConfigLayoutTest {
         assertFalse(config.preserveMining); assertTrue(config.spamClickThroughBlocks);
         assertEquals(14, config.rateOptions(false).high());
         assertEquals(12.5, config.rateOptions(true).medium());
+    }
+    @Test void installedOneConfigRecognizesEveryAccordionAndItsEmbeddedSwitch() throws Exception {
+        Tree tree = tree(new OrvenConfig());
+        int sections = 0;
+        for (var node : tree.map.values()) {
+            if (!(node instanceof Tree section)) continue;
+            var row = org.polyfrost.oneconfig.internal.ui.search.SettingIndexKt.buildAccordionNode(section);
+            assertNotNull(row, section.getID());
+            assertTrue(row.getBody().size() <= 6, section.getID());
+            sections++;
+        }
+        assertEquals(17, sections);
+        var held = org.polyfrost.oneconfig.internal.ui.search.SettingIndexKt.buildAccordionNode(tree.getChild("heldClick"));
+        assertEquals("heldClickEnabled", held.getHead().getID());
+        assertEquals(4, held.getBody().size());
+    }
+    @Test void smallerAccordionsHaveNoNestedTreesOrDuplicateControls() throws Exception {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        var visible = new java.util.HashSet<String>();
+        for (var node : tree.map.values()) {
+            if (!(node instanceof Tree section)) continue;
+            assertEquals(true, section.getMetadata("collapsed"));
+            assertTrue(section.map.size() <= 7, section.getID());
+            for (var entry : section.map.entrySet()) {
+                assertFalse(entry.getValue() instanceof Tree);
+                assertTrue(visible.add(entry.getKey()), entry.getKey());
+            }
+        }
+        assertEquals("Spam Clicking", tree.get("heldClick").getMetadata("subcategory"));
+        assertNull(tree.get("heldClick", "heldClickEnabled").getMetadata("visualizer"));
+        assertFalse(config.heldClickEnabled); assertTrue(config.heldClickLeft); assertFalse(config.heldClickRight);
+        assertTrue(config.heldClickEntityOnly); assertTrue(config.heldClickWeaponOnly); assertTrue(config.heldClickRequiresPlayer);
+        assertEquals(250, config.heldClickDelayMs); assertFalse(config.heldClickInstant);
+        assertEquals(org.polyfrost.oneconfig.api.config.v1.Property.Display.HIDDEN,
+                tree.getProp("heldClick", "heldClickInstant").getDisplay());
+        tree.getProp("heldClick", "heldClickEnabled").setAs(true);
+        assertEquals(org.polyfrost.oneconfig.api.config.v1.Property.Display.SHOWN,
+                tree.getProp("heldClick", "heldClickInstant").getDisplay());
+        tree.getProp("spamRamp", "spamRampEnabled").setAs(false);
+        assertEquals(org.polyfrost.oneconfig.api.config.v1.Property.Display.HIDDEN,
+                tree.getProp("spamRamp", "spamRampMs").getDisplay());
+    }
+    @Test void layoutMigrationPreservesVersionTwoProfilesAndBindings() {
+        var config = new OrvenConfig(); config.configSchema = 2;
+        config.spamMediumCps = 11.3; config.spamRequiresPlayer = true; config.spamRampMs = 600;
+        var bind = config.spamBind;
+        assertTrue(config.migrateValues()); assertEquals(3, config.configSchema);
+        assertEquals(11.3, config.spamMediumCps); assertTrue(config.spamRequiresPlayer);
+        assertEquals(600, config.spamRampMs); assertSame(bind, config.spamBind);
+        assertFalse(config.migrateValues());
     }
     @Test void spamBlockBypassIsIndependentOfPhysicalProtection() {
         var config = new OrvenConfig(); config.preserveMining = true;

@@ -130,3 +130,37 @@ left/right button hold, both HUD lines and profile/context cleanup. The earlier 
 startup test was for the original implementation, not this redesign; the SDL graphics
 failure described above prevented full game testing. .git remains read-only in this
 session, so changes cannot be committed here; the user's .gitignore edit is preserved.
+
+## Held-click and settings build (latest, 2026-10-02)
+
+Filesystem and Gradle socket restrictions no longer apply. The original OneClient beta
+jar path is now absent; previously extracted exact OneConfig 1.2.9 APIs remain cached.
+A normal Gradle build succeeds using those APIs without rerunning extraction:
+
+```sh
+JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build -x prepareOneConfig
+```
+
+The clean build removed stale helper classes left by the earlier cached-build fallback.
+The final incremental build after the last source change also succeeded. All **33 tests**
+pass. New coverage includes eligible hold delay, loss/release/reset, independent timers,
+source priority and Button Hold suppression; entity/weapon/player filters and strict
+instant-bypass checks; tab-name membership, absent lists, self/dead/spectator exclusion
+and four-block boundaries; schema-2 migration without profile resets; small sibling
+accordions, reactive dependent controls and actual OneConfig 1.2.9 accordion indexing.
+The full category-index builder requires intermediary game/platform classes and cannot
+run in the plain named-classpath JUnit process; category order is checked as metadata.
+
+The artifact contains 17 mod classes, all Java 25 (major 69), Gen 2/intermediary manifest
+metadata, the requested description and no dependency jars. All four mapped injector
+methods/targets/ordinals match the earlier Loom-built baseline. SHA256:
+`2bbb6c1ce0b44aeedc587532d8ec53abe21420caa55784c53e5f97cea63ae8ae`.
+
+No real-client visual or gameplay test was performed for these changes. Check the two
+settings tabs and new headings in OneConfig; enable Spam Clicking and Held Click;
+verify physical remapped left/right bindings, 250-ms eligible delay and reset when a
+filter fails; instant activation with all three checks while retaining ramp; block/air
+eligibility only with Entity target off; nearby players with matching tab usernames;
+item-use preservation; simultaneous sources and Button Hold suppression; context,
+rebind and profile cleanup. Previously documented isolated startup is historical.
+Local Git commits work in this session. The user's existing .gitignore edit stays unstaged.

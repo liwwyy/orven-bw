@@ -23,7 +23,7 @@ public final class OrvenConfig extends Config {
     public boolean enabled = false;
     @Slider(title = "Activation CPS", description = "Your manual CPS must be above this.", category = "ClickAssist", subcategory = "Physical Assist", min = 0, max = 20, step = 1)
     public int activationCps = 4;
-    @Switch(title = "Require nearby player", description = "Another player within four blocks.", category = "ClickAssist", subcategory = "Physical Assist")
+    @Switch(title = "Require nearby player", description = "Living player in tab within four blocks.", category = "ClickAssist", subcategory = "Physical Assist")
     public boolean requiresPlayer = false;
     @Switch(title = "Disable in creative", description = "", category = "ClickAssist", subcategory = "Physical Assist")
     public boolean disableInCreative = true;
@@ -67,12 +67,28 @@ public final class OrvenConfig extends Config {
     public boolean spamWeaponOnly = true;
     @Switch(title = "Right: blocks only", description = "", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamBlocksOnly = true;
-    @Switch(title = "Require nearby player", description = "Another player within four blocks.", category = "ClickAssist", subcategory = "Spam Clicking")
+    @Switch(title = "Require nearby player", description = "Living player in tab within four blocks.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamRequiresPlayer = false;
-    @Switch(title = "Disable in creative", description = "", category = "ClickAssist", subcategory = "Spam Clicking")
+    @Switch(title = "Disable in creative", description = "Applies to keybind and held spam.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamDisableInCreative = true;
     @Switch(title = "Target an entity", description = "Pause when no entity is under the crosshair.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamOnlyWhileTargeting = false;
+    @Switch(title = "Held click", description = "Spam while holding the attack or use binding.", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickEnabled = false;
+    @Switch(title = "Left click", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickLeft = true;
+    @Switch(title = "Right click", description = "Pauses during blocking, eating and charging.", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickRight = false;
+    @Slider(title = "Hold delay (ms)", description = "Continuous eligible hold before spam starts.", category = "ClickAssist", subcategory = "Spam Clicking", min = 0, max = 2000, step = 10)
+    public int heldClickDelayMs = 250;
+    @Switch(title = "Instant activation", description = "Skip delay with an entity target, sword or stick, and nearby player. Ramp still applies.", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickInstant = false;
+    @Switch(title = "Nearby player", description = "Living player in tab within four blocks.", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickRequiresPlayer = true;
+    @Switch(title = "Sword or stick", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickWeaponOnly = true;
+    @Switch(title = "Entity target", description = "Turn off to allow blocks and air.", category = "ClickAssist", subcategory = "Spam Clicking")
+    public boolean heldClickEntityOnly = true;
     @Switch(title = "Swords", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamSwords = true;
     @Switch(title = "Axes", category = "ClickAssist", subcategory = "Spam Clicking")
@@ -93,23 +109,23 @@ public final class OrvenConfig extends Config {
     public double assistLowCps = 9.5;
     @Switch(title = "Vary click timing", description = "Vary intervals around the current rate.", category = "ClickAssist", subcategory = "Physical Assist")
     public boolean assistVaryTiming = true;
-    @Switch(title = "Gradual ramp", description = "Start gently and increase to the high rate.", category = "ClickAssist", subcategory = "Physical Assist")
+    @Switch(title = "Enable ramp", description = "Start gently and increase to the high rate.", category = "ClickAssist", subcategory = "Physical Assist")
     public boolean assistRampEnabled = true;
     @Slider(title = "Ramp time (ms)", description = "Full rate by the end of this time.", category = "ClickAssist", subcategory = "Physical Assist", min = 100, max = 5000, step = 100)
     public int assistRampMs = 1000;
     @Switch(title = "Exhaustion", description = "Occasional slower periods during long sessions.", category = "ClickAssist", subcategory = "Physical Assist")
     public boolean assistExhaustionEnabled = true;
-    @Slider(title = "Exhaustion starts after (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1000, max = 60000, step = 1000)
+    @Slider(title = "Starts after (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1000, max = 60000, step = 1000)
     public int assistExhaustionAfterMs = 8000;
-    @Slider(title = "Exhaustion check interval (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1000, max = 30000, step = 1000)
+    @Slider(title = "Check interval (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1000, max = 30000, step = 1000)
     public int assistExhaustionIntervalMs = 4000;
-    @Slider(title = "Exhaustion chance (%)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 0, max = 100, step = 1)
+    @Slider(title = "Chance (%)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 0, max = 100, step = 1)
     public int assistExhaustionChance = 30;
-    @Slider(title = "Exhaustion duration (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 100, max = 3000, step = 100)
+    @Slider(title = "Duration (ms)", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 100, max = 3000, step = 100)
     public int assistExhaustionDurationMs = 600;
-    @Slider(title = "Exhausted minimum CPS", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1, max = 20, step = 0.1f)
+    @Slider(title = "Minimum CPS", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1, max = 20, step = 0.1f)
     public double assistExhaustionMinCps = 8.0;
-    @Slider(title = "Exhausted maximum CPS", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1, max = 20, step = 0.1f)
+    @Slider(title = "Maximum CPS", description = "", category = "ClickAssist", subcategory = "Physical Assist", min = 1, max = 20, step = 0.1f)
     public double assistExhaustionMaxCps = 9.0;
     @Slider(title = "High CPS · 20%", description = "Upper level for one fifth of the session.", category = "ClickAssist", subcategory = "Spam Clicking", min = 1, max = 20, step = 0.1f)
     public double spamHighCps = 14.0;
@@ -119,23 +135,23 @@ public final class OrvenConfig extends Config {
     public double spamLowCps = 9.5;
     @Switch(title = "Vary click timing", description = "Vary intervals around the current rate.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamVaryTiming = true;
-    @Switch(title = "Gradual ramp", description = "Start gently and increase to the high rate.", category = "ClickAssist", subcategory = "Spam Clicking")
+    @Switch(title = "Enable ramp", description = "Start gently and increase to the high rate.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamRampEnabled = true;
     @Slider(title = "Ramp time (ms)", description = "Full rate by the end of this time.", category = "ClickAssist", subcategory = "Spam Clicking", min = 100, max = 5000, step = 100)
     public int spamRampMs = 1000;
     @Switch(title = "Exhaustion", description = "Occasional slower periods during long sessions.", category = "ClickAssist", subcategory = "Spam Clicking")
     public boolean spamExhaustionEnabled = true;
-    @Slider(title = "Exhaustion starts after (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1000, max = 60000, step = 1000)
+    @Slider(title = "Starts after (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1000, max = 60000, step = 1000)
     public int spamExhaustionAfterMs = 8000;
-    @Slider(title = "Exhaustion check interval (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1000, max = 30000, step = 1000)
+    @Slider(title = "Check interval (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1000, max = 30000, step = 1000)
     public int spamExhaustionIntervalMs = 4000;
-    @Slider(title = "Exhaustion chance (%)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 0, max = 100, step = 1)
+    @Slider(title = "Chance (%)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 0, max = 100, step = 1)
     public int spamExhaustionChance = 30;
-    @Slider(title = "Exhaustion duration (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 100, max = 3000, step = 100)
+    @Slider(title = "Duration (ms)", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 100, max = 3000, step = 100)
     public int spamExhaustionDurationMs = 600;
-    @Slider(title = "Exhausted minimum CPS", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1, max = 20, step = 0.1f)
+    @Slider(title = "Minimum CPS", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1, max = 20, step = 0.1f)
     public double spamExhaustionMinCps = 8.0;
-    @Slider(title = "Exhausted maximum CPS", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1, max = 20, step = 0.1f)
+    @Slider(title = "Maximum CPS", description = "", category = "ClickAssist", subcategory = "Spam Clicking", min = 1, max = 20, step = 0.1f)
     public double spamExhaustionMaxCps = 9.0;
     @Switch(title = "Enable button hold", description = "", category = "ClickAssist", subcategory = "Button Hold")
     public boolean holdEnabled = false;
@@ -168,25 +184,32 @@ public final class OrvenConfig extends Config {
     @Override protected Tree makeTree() {
         Tree collected = super.makeTree();
         Tree root = Tree.tree("orven-bw.json");
-        String[] names = {"General", "Physical Assist", "Spam Clicking", "Button Hold", "HUD"};
-        String[] ids = {"general", "assist", "spam", "hold", "hud"};
-        String[] toggles = {"modEnabled", "enabled", "spamEnabled", "holdEnabled", "showHud"};
-        for (int i = 0; i < names.length; i++) {
-            Tree section = Tree.tree(ids[i]);
-            section.addMetadata("title", names[i]);
-            section.addMetadata("category", i == 0 ? "General" : "ClickAssist");
-            section.addMetadata("subcategory", "Settings");
-            section.addMetadata("collapsed", true);
-            Node toggle = collected.get(toggles[i]);
-            toggle.removeMetadata("visualizer");
-            toggle.removeMetadata("hidden");
-            section.put(toggle);
-            for (var entry : collected.map.entrySet()) {
-                if (entry.getKey().equals(toggles[i])) continue;
-                if (names[i].equals(entry.getValue().getMetadata("subcategory"))) section.put(entry.getValue());
-            }
-            root.put(section);
-        }
+        section(root, collected, "general", "General", "General", "General", "modEnabled",
+                "settingsBind", "scoreboardOnly", "scoreboardWord");
+        section(root, collected, "assist", "Activation", "ClickAssist", "Physical Assist", "enabled",
+                "activationCps", "leftClick", "rightClick", "boostDelayMs");
+        section(root, collected, "assistFilters", "Filters", "ClickAssist", "Physical Assist", null,
+                "requiresPlayer", "disableInCreative", "onlyWhileTargeting", "preserveMining", "blocksOnly");
+        section(root, collected, "assistWeapons", "Weapons", "ClickAssist", "Physical Assist", "weaponOnly",
+                "swords", "sticks", "axes", "rods", "hoes", "shovels");
+        rateSections(root, collected, "assist", "Physical Assist");
+        section(root, collected, "spam", "Activation Button", "ClickAssist", "Spam Clicking", "spamEnabled",
+                "spamBind", "spamMode", "spamButton");
+        section(root, collected, "heldClick", "Held Click", "ClickAssist", "Spam Clicking", "heldClickEnabled",
+                "heldClickLeft", "heldClickRight", "heldClickDelayMs", "heldClickInstant");
+        section(root, collected, "heldFilters", "Held Filters", "ClickAssist", "Spam Clicking", null,
+                "heldClickRequiresPlayer", "heldClickWeaponOnly", "heldClickEntityOnly");
+        section(root, collected, "spamFilters", "Keybind Filters", "ClickAssist", "Spam Clicking", null,
+                "spamClickThroughBlocks", "spamBlocksOnly", "spamRequiresPlayer", "spamDisableInCreative", "spamOnlyWhileTargeting");
+        section(root, collected, "spamWeapons", "Keybind Weapons", "ClickAssist", "Spam Clicking", "spamWeaponOnly",
+                "spamSwords", "spamSticks", "spamAxes", "spamRods", "spamHoes", "spamShovels");
+        rateSections(root, collected, "spam", "Spam Clicking");
+        section(root, collected, "hold", "Button Hold", "ClickAssist", "Button Hold", "holdEnabled",
+                "holdLeftBind", "holdRightBind");
+        section(root, collected, "hud", "CPS Display", "ClickAssist", "HUD", "showHud", "editHud");
+        depends(collected, "scoreboardOnly", "scoreboardWord");
+        depends(collected, "heldClickEnabled", "heldClickLeft", "heldClickRight", "heldClickDelayMs",
+                "heldClickInstant", "heldClickRequiresPlayer", "heldClickWeaponOnly", "heldClickEntityOnly");
         // Append compatibility aliases after visible sections to preserve General-first order.
         for (var field : getClass().getFields()) {
             if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
@@ -197,13 +220,50 @@ public final class OrvenConfig extends Config {
         return root;
     }
 
+    private static void section(Tree root, Tree collected, String id, String title, String category,
+                                String subcategory, String toggle, String... fields) {
+        Tree section = Tree.tree(id);
+        section.addMetadata("title", title);
+        section.addMetadata("category", category);
+        section.addMetadata("subcategory", subcategory);
+        section.addMetadata("collapsed", true);
+        if (toggle != null) {
+            Node head = collected.get(toggle);
+            head.removeMetadata("visualizer");
+            head.removeMetadata("hidden");
+            section.put(head);
+        }
+        for (String field : fields) section.put(collected.get(field));
+        root.put(section);
+    }
+    private static void rateSections(Tree root, Tree collected, String prefix, String subcategory) {
+        section(root, collected, prefix + "Rates", "CPS Levels", "ClickAssist", subcategory, null,
+                prefix + "HighCps", prefix + "MediumCps", prefix + "LowCps", prefix + "VaryTiming");
+        section(root, collected, prefix + "Ramp", "Ramp", "ClickAssist", subcategory, prefix + "RampEnabled", prefix + "RampMs");
+        section(root, collected, prefix + "Exhaustion", "Exhaustion", "ClickAssist", subcategory, prefix + "ExhaustionEnabled",
+                prefix + "ExhaustionAfterMs", prefix + "ExhaustionIntervalMs", prefix + "ExhaustionChance",
+                prefix + "ExhaustionDurationMs", prefix + "ExhaustionMinCps", prefix + "ExhaustionMaxCps");
+        depends(collected, prefix + "RampEnabled", prefix + "RampMs");
+        depends(collected, prefix + "ExhaustionEnabled", prefix + "ExhaustionAfterMs", prefix + "ExhaustionIntervalMs",
+                prefix + "ExhaustionChance", prefix + "ExhaustionDurationMs", prefix + "ExhaustionMinCps", prefix + "ExhaustionMaxCps");
+        String weapon = prefix.equals("assist") ? "weaponOnly" : "spamWeaponOnly";
+        String[] weapons = prefix.equals("assist") ? new String[]{"swords", "sticks", "axes", "rods", "hoes", "shovels"}
+                : new String[]{"spamSwords", "spamSticks", "spamAxes", "spamRods", "spamHoes", "spamShovels"};
+        depends(collected, weapon, weapons);
+    }
+    @SuppressWarnings("unchecked")
+    private static void depends(Tree collected, String toggle, String... fields) {
+        for (String field : fields) collected.getProp(field).addDisplayCondition((Property<Boolean>) collected.getProp(toggle), true);
+    }
+
     @Override protected void initialize(boolean byManager) {
         super.initialize(byManager);
         migrate();
     }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 2) return false;
+        if (configSchema >= 3) return false;
+        if (configSchema == 2) { configSchema = 3; return true; }
         assistRampEnabled = spamRampEnabled = rampEnabled;
         assistRampMs = spamRampMs = rampMs == 1200 ? 1000 : rampMs;
         assistVaryTiming = spamVaryTiming = randomizeTiming;
@@ -221,7 +281,7 @@ public final class OrvenConfig extends Config {
         spamBlocksOnly = blocksOnly;
         spamRequiresPlayer = requiresPlayer;
         spamDisableInCreative = disableInCreative;
-        configSchema = 2;
+        configSchema = 3;
         return true;
     }
 

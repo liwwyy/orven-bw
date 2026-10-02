@@ -10,8 +10,9 @@ Install `build/libs/orven-bw-0.1.0+mc1.8.9.jar` in the OneClient instance's
 
 Press **P** to open this mod's OneConfig page. The hotkey is configurable in General
 and works when the mod is disabled. General comes first, followed by ClickAssist.
-Each section has its enable switch embedded in the accordion header; settings start
-collapsed. Physical ClickAssist, Spam Clicking and Button Hold enable independently.
+ClickAssist has Physical Assist, Spam Clicking, Button Hold and HUD headings.
+Small accordions separate activation, filters, weapons, CPS levels, ramp and exhaustion.
+Enable switches stay in their corresponding headers; settings start collapsed. Physical ClickAssist, Spam Clicking and Button Hold enable independently.
 The General mod switch and optional scoreboard filter govern all three.
 
 - **General:** mod switch, settings hotkey, and optional sidebar text filter. The
@@ -21,10 +22,25 @@ The General mod switch and optional scoreboard filter govern all three.
   and initial boost delay. Preserve block breaking defaults to off.
 - **Spam Clicking:** hold middle mouse by default, or select Toggle. Choose left/right
   output and configure this feature's own filters, weapons, rates and exhaustion.
-  Click through blocks defaults to on; turn it off to pause left spam on blocks.
+  Click through blocks defaults to on; turn it off to pause left keybind spam on blocks.
+  **Held Click** is a separate, initially disabled trigger under Spam Clicking. Enable
+  Spam Clicking and Held Click to use it. Left defaults on and right off; it respects
+  your physical attack/use bindings. By default, hold for 250 ms while targeting an
+  entity, carrying a sword or stick, with another living player within four blocks.
+  Each filter can be disabled; disable Entity target to allow blocks/air. The delay
+  starts only after all enabled filters pass and resets when eligibility or input stops.
+  Optional instant activation skips the delay only when all three checks pass, while
+  retaining the ramp. Right held spam pauses during blocking, eating or charging.
+  Both triggers use the spam rate profile; keybind spam wins on the same side.
+  Button Hold suppresses generated clicks on its side and cannot activate Held Click.
 - **Button Hold:** separate unassigned left/right toggle binds hold the configured
   attack/use binding until toggled off. Vanilla handles mining and item use.
 - **HUD:** visibility switch and shortcut to OneConfig's HUD editor.
+
+Nearby checks exclude self, dead players, spectators and usernames absent from the
+server tab list. Comparison uses profile usernames, ignoring case and display formatting.
+Missing network/tab information fails the check. A player-shaped NPC included in the
+tab list still qualifies under this rule; no extra NPC name or UUID heuristics are used.
 
 ## CPS profiles
 
@@ -91,6 +107,16 @@ If the local sandbox prevents Gradle from starting, use the already populated ca
 ```sh
 python3 scripts/build-cached.py
 ```
+
+If the original beta instance has been removed but `.reference/oneconfig-beta` still
+contains the previously extracted 1.2.9 APIs, build with:
+
+```sh
+JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build -x prepareOneConfig
+```
+
+For another copy of the same beta jar, pass `-PoneconfigJar=/absolute/path/to/the.jar`
+to the normal build. API compatibility with older OneConfig versions is not assumed.
 
 The fallback runs the tests and uses Tiny Remapper's MixinExtension to build an
 intermediary jar. It requires the prior Gradle/Loom caches and the installed beta jar.

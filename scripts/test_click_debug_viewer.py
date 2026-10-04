@@ -95,7 +95,11 @@ class ViewerTests(unittest.TestCase):
 
     def test_http_page_script_and_api_are_self_contained(self):
         self.append(event(123))
-        server = ThreadingHTTPServer(('127.0.0.1',0), handler_for(self.cache))
+        other = self.path.parent / 'other.jsonl'
+        other.write_text(json.dumps(event(456)) + '\n')
+        second = LogCache(log=other)
+        server = ThreadingHTTPServer(('127.0.0.1',0), handler_for(
+            self.cache, {'liwwyy': self.cache, 'wren': second}))
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
         url = f'http://127.0.0.1:{server.server_port}'
@@ -105,6 +109,12 @@ class ViewerTests(unittest.TestCase):
             self.assertIn(b'/api/events', response.read())
         with urlopen(url+'/api/events') as response:
             self.assertEqual(123, json.load(response)['events'][0]['timestamp_ms'])
+        for name, expected in [('liwwyy', 123), ('wren', 456)]:
+            for suffix in ['', '/']:
+                with urlopen(url + '/' + name + suffix) as response:
+                    self.assertIn(b'/viewer.js', response.read())
+            with urlopen(url + '/' + name + '/api/events') as response:
+                self.assertEqual(expected, json.load(response)['events'][0]['timestamp_ms'])
 
 
 if __name__ == '__main__':

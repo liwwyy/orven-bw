@@ -9,7 +9,7 @@ from pathlib import Path
 import threading
 from urllib.parse import urlsplit
 
-DEFAULT_DIRECTORY = Path('/home/user/.local/share/Polyfrost/OneClient/clusters/1.8.9 OC/config/orven-bw')
+DEFAULT_DIRECTORY = Path('/home/user/Projects/orven-bw/click_logs')
 ASSETS = Path(__file__).resolve().parent / 'click_debug'
 
 
@@ -73,16 +73,20 @@ class LogCache:
                         retained=len(self.rows), malformed=self.malformed, error=error)
 
 
-def handler_for(cache):
+def handler_for(cache, samples=None):
+    samples = samples or {}
+    pages = {f'/{name}': sample for name, sample in samples.items()}
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             route = urlsplit(self.path).path
-            if route == '/api/events':
-                body = json.dumps(cache.snapshot(), allow_nan=False).encode()
+            page = route.rstrip('/')
+            sample = pages.get(page.removesuffix('/api/events'))
+            if route == '/api/events' or (sample is not None and page.endswith('/api/events')):
+                body = json.dumps((sample if sample is not None else cache).snapshot(), allow_nan=False).encode()
                 content_type = 'application/json; charset=utf-8'
-            elif route in ('/', '/viewer.js'):
-                body = (ASSETS / ('index.html' if route == '/' else 'viewer.js')).read_bytes()
-                content_type = 'text/html; charset=utf-8' if route == '/' else 'text/javascript; charset=utf-8'
+            elif route in ('/', '/viewer.js') or page in pages:
+                body = (ASSETS / ('viewer.js' if route == '/viewer.js' else 'index.html')).read_bytes()
+                content_type = 'text/javascript; charset=utf-8' if route == '/viewer.js' else 'text/html; charset=utf-8'
             else:
                 self.send_error(404)
                 return
@@ -110,9 +114,20 @@ def main():
     if args.max_events < 1:
         parser.error('--max-events must be positive')
     cache = LogCache(args.directory, args.log, args.max_events)
-    with ThreadingHTTPServer((args.host, args.port), handler_for(cache)) as server:
+    samples = {}
+    if not args.log and args.directory.is_dir():
+        for directory in sorted(args.directory.iterdir()):
+            if directory.is_dir() and directory.name.replace('-', '').replace('_', '').isalnum():
+                candidate = LogCache(directory, limit=args.max_events)
+                if candidate.locate().is_file():
+                    samples[directory.name] = candidate
+    if samples:
+        cache = next(iter(samples.values()))
+    with ThreadingHTTPServer((args.host, args.port), handler_for(cache, samples)) as server:
         print(f'Click viewer: http://{args.host}:{server.server_port}', flush=True)
         print(f'Log: {cache.locate()} (read only; appends refresh automatically)', flush=True)
+        for name, sample in samples.items():
+            print(f'http://{args.host}:{server.server_port}/{name} → {sample.locate()}', flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:

@@ -1,5 +1,11 @@
 'use strict';
 const $ = id => document.getElementById(id);
+const sampleName = decodeURIComponent(location.pathname.replace(/^\/|\/$/g, ''));
+if (sampleName) {
+ document.title = `${sampleName} · Click debug`;
+ const heading = document.querySelector('h1');
+ if (heading) heading.textContent = `${sampleName} · Click debug`;
+}
 const colors = {mouse:'#7dd3fc',keyboard_binding:'#38bdf8',cps_boost:'#c4a5ff',spam_click:'#fbad73',mouse_hold_click:'#89e3ac',button_hold:'#f0a8d9'};
 const names = {mouse:'Physical mouse',keyboard_binding:'Physical keyboard',cps_boost:'Physical CPS boost',spam_click:'Spam keybind',mouse_hold_click:'Mouse hold click',button_hold:'Button hold'};
 let data=[], selected='latest', view=null, bounds=[0,1], plots=new Map(), busy=false, follow=true;
@@ -50,7 +56,7 @@ function render(){
 }
 async function refresh(){
  if(busy)return;busy=true;
- try{const result=await(await fetch('/api/events')).json();data=result.events;
+ try{const result=await(await fetch(`${location.pathname.replace(/\/$/, '')}/api/events`)).json();data=result.events;
  const sessions=[...new Set(data.map(r=>r.session))],session=$('session');const old=selected;session.replaceChildren();
  const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;session.append(o);};option('all','All sessions');
  for(const id of sessions){const first=data.find(r=>r.session===id);option(id,new Date(first.timestamp_ms).toLocaleString()+' · '+id.slice(0,8));}

@@ -179,3 +179,22 @@ The fractional scheduler adds symmetric triangular interval variation. Configura
 bounds, tick dispatch and stall cancellation remain; this is not a human/anti-cheat guarantee.
 Raven-bS is now under ignored `.reference/raven-Bs`; original icons are ignored under
 `icons/`, with the supplied ClickAssist icon copied into tracked runtime resources.
+
+## Native item picker and click debug follow-up
+
+The oneconfig-v1 documentation MCP was consulted for ItemList; it did not return the
+needed API detail. DeepWiki was consulted for Polyfrost/OneConfig and confirmed the
+native annotation's String[]/List<String> support. The checked-out annotation source and
+`javap` of the actual cached **config-impl-1.2.9.jar** verify `@ItemList` and its
+`Visualizer.ItemListVisualizer`; these installed beta APIs determine compatibility.
+Item values use registry identifiers and matching remains the consuming mod's job.
+The item's MCP-verified Minecraft source registers raw beef as **minecraft:beef**;
+`raw_beef` is not its 1.8.9 registry name. Any selected `SwordItem` enables every
+`SwordItem`, while other registry items require identity equality.
+
+Ornithe mappings/source inspection verified `Entity.isSneaking`, `Item.REGISTRY`,
+`net.minecraft.resource.Identifier`, and the raw/cooked beef distinction. Crouch cancel
+also checks the currently bound physical sneak key, so it respects remapping.
+Real mouse events are observed at LWJGL `Mouse.next` return and retain native nanosecond
+and observation millisecond timestamps. Artificial clicks are recorded at the existing
+`KeyBinding.click` submission sites, with the active mode identified separately.

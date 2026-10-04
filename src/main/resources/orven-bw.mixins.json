@@ -5,7 +5,8 @@
   "client": [
     "MinecraftInputMixin",
     "HitEffectsMixin",
-    "HitEffectsRenderMixin"
+    "HitEffectsRenderMixin",
+    "MouseDebugMixin"
   ],
   "injectors": {
     "defaultRequire": 1

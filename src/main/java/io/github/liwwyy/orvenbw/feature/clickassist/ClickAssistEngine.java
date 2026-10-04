@@ -9,6 +9,7 @@ public final class ClickAssistEngine {
     private static final long SECOND = 1_000_000_000L;
     private final Channel[] channels = {new Channel(), new Channel()};
     private final DoubleSupplier random;
+    private long lastClick = Long.MIN_VALUE;
     public ClickAssistEngine(DoubleSupplier random) { this.random = random; }
     public record Cps(int base, int boosted) { public int total() { return base + boosted; } }
     private static final class Channel {
@@ -31,6 +32,7 @@ public final class ClickAssistEngine {
         if (!c.hasPhysical) c.countingSince = now;
         c.hasPhysical = true;
         c.physical.addLast(now);
+        lastClick = now;
     }
 
     /** Use cadence during warm-up; after one second use measured physical CPS. */
@@ -77,6 +79,7 @@ public final class ClickAssistEngine {
         c.credit -= c.threshold;
         c.threshold = intervalWeight(vary, variation);
         c.boosted.addLast(now);
+        lastClick = now;
         return true;
     }
     private double intervalWeight(boolean vary, double variation) {
@@ -102,7 +105,9 @@ public final class ClickAssistEngine {
         Channel c = channel(button); prune(c, now);
         return new Cps(c.physical.size(), c.boosted.size());
     }
+    public long lastClickNanos() { return lastClick; }
     public void reset() {
+        lastClick = Long.MIN_VALUE;
         for (Channel c : channels) {
             c.physical.clear(); c.boosted.clear(); c.hasPhysical = c.hasPrevious = c.running = false;
             c.credit = 0;

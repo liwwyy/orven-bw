@@ -29,6 +29,9 @@ public abstract class MinecraftInputMixin {
     private void orven$keyboardPress(CallbackInfo ci) {
         if (OrvenBw.instance() != null && !Keyboard.isRepeatEvent()) {
             int key = Keyboard.getEventKey() == 0 ? Keyboard.getEventCharacter() + 256 : Keyboard.getEventKey();
+            Minecraft mc = (Minecraft) (Object) this;
+            if (key == mc.options.attackKey.getKeyCode() || key == mc.options.useKey.getKeyCode())
+                OrvenBw.instance().debugLog().event("physical", "keyboard_binding", key == mc.options.attackKey.getKeyCode() ? "left" : "right", "press", key, -1);
             OrvenBw.instance().features().onInput((Minecraft) (Object) this, key);
         }
     }

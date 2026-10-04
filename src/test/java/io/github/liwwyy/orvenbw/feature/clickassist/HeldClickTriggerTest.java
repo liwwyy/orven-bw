@@ -50,4 +50,12 @@ class HeldClickTriggerTest {
         assertEquals(-1, HeldClickTrigger.source(true, true, true, true));
         assertEquals(-1, HeldClickTrigger.source(false, false, false, false));
     }
+    @Test void crouchCancellationCannotBeBypassedAndRequiresFreshEligibleHoldAfterRelease() {
+        var trigger = new HeldClickTrigger();
+        assertTrue(trigger.active(0, true, true, 250 * MS, true));
+        var crouched = new HeldClickTrigger.Conditions(false, true, true, true);
+        assertFalse(trigger.active(100 * MS, true, crouched.allows(false, false, false), 250 * MS, crouched.instantReady()));
+        assertFalse(trigger.active(500 * MS, true, true, 250 * MS, false));
+        assertTrue(trigger.active(750 * MS, true, true, 250 * MS, false));
+    }
 }

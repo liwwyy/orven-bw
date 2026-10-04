@@ -14,8 +14,10 @@ public final class ClickAssistHud extends TextHud {
     public String format = CpsFormat.DEFAULT;
     @Switch(title = "Show CPS text", description = "Append uppercase CPS after the left | right totals.")
     public boolean showCpsLabel = true;
-    @Switch(title = "Hide when idle", description = "Hide only when both left and right one-second click totals are zero.")
+    @Switch(title = "Hide when unused", description = "Hide after no physical or generated click has occurred for the timeout below.")
     public boolean hideWhenIdle = false;
+    @Slider(title = "HUD hide timeout (ms)", description = "Time since the last click before hiding. New input shows the HUD immediately.", min = 0, max = 10000, step = 100)
+    public int hideTimeoutMs = 1000;
     public ClickAssistHud() { super("orven-bw-clickassist-hud.json", "ClickAssist CPS", Hud.Category.getCOMBAT(), "", ""); }
     @Override public long updateFrequency() { return 50_000_000L; }
     @Override protected String getText() {
@@ -28,7 +30,7 @@ public final class ClickAssistHud extends TextHud {
         if (HudManager.INSTANCE.isEditing()) return true;
         OrvenBw mod = OrvenBw.instance();
         return mod != null && mod.config().showHud && mod.config().modEnabled
-                && (!hideWhenIdle || mod.clickAssist().cps(0).total() > 0 || mod.clickAssist().cps(1).total() > 0);
+                && HudIdleTimeout.visible(hideWhenIdle, System.nanoTime(), mod.clickAssist().lastClickNanos(), hideTimeoutMs);
     }
     @Override public String concat(String prefix, String value, String suffix) {
         return super.concat(prefix, value, CpsFormat.suffix(suffix));

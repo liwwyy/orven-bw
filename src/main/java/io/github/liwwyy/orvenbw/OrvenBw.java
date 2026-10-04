@@ -17,10 +17,15 @@ public final class OrvenBw implements ClientModInitializer {
     private OrvenConfig config;
     private ClickAssistFeature clickAssist;
     private HitEffectsFeature hitEffects;
+    private io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog;
 
     @Override public void onInitializeClient() {
         config = new OrvenConfig();
         config.preload();
+        debugLog = new io.github.liwwyy.orvenbw.debug.ClickDebugLog(
+                net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("orven-bw/click-debug.jsonl"),
+                () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error));
+        Runtime.getRuntime().addShutdownHook(new Thread(debugLog::close, "orven-bw-debug-shutdown"));
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);
         hitEffects = new HitEffectsFeature(config);
@@ -37,6 +42,7 @@ public final class OrvenBw implements ClientModInitializer {
         LOGGER.info("orven-bw initialized (maintainer: liwwyy, Feather Gen 2 build 2)");
     }
 
+    public io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog() { return debugLog; }
     public static OrvenBw instance() { return instance; }
     public FeatureRegistry features() { return features; }
     public OrvenConfig config() { return config; }

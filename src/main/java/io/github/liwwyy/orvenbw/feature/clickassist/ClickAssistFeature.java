@@ -79,12 +79,17 @@ public final class ClickAssistFeature implements ClientFeature {
         for (int button = 0; button <= 1; button++) {
             int code = button == 0 ? attackCode : useCode;
             if (held[button]) {
-                if (!ownsHold[button]) KeyBinding.click(code);
+                if (!ownsHold[button]) {
+                    KeyBinding.click(code);
+                    debug("button_hold", button, "queue", code);
+                    debug("button_hold", button, "hold_down", code);
+                }
                 KeyBinding.set(code, true);
                 ownsHold[button] = true;
             } else if (ownsHold[button]) {
                 KeyBinding.set(code, physicalDown(code));
                 ownsHold[button] = false;
+                debug("button_hold", button, "hold_up", code);
             }
             boolean explicitSpam = config.spamEnabled && (config.spamMode == 1 ? spamLatched[button] : spamPressed[button]);
             boolean heldSpam = heldTriggers[button].active(now, physicalDown(code),
@@ -103,18 +108,23 @@ public final class ClickAssistFeature implements ClientFeature {
                 sources[button] = source; profiles[button] = profile;
             }
             double base = engine.manualRate(button, now);
-            double target = sessions[button].target(now, clicking, spamming ? 5 : base + 1, profile);
+            double target = sessions[button].target(now, clicking, spamming ? (config.rockyRamp ? 1 : 5) : base + 1, profile);
             double generated = Math.max(0, target - base);
             boolean clicked = engine.poll(button, now, generated, clicking,
                     config.randomizeTiming,
                     spamming ? 0 : config.boostDelayMs * 1_000_000L, config.timingVariation / 100.0);
             if (clicked) {
                 KeyBinding.click(code);
+                debug(source == 1 ? "spam_click" : source == 2 ? "mouse_hold_click" : "cps_boost", button, "queue", code);
                 activeButton = button;
             }
         }
     }
 
+    private static void debug(String method, int button, String action, int code) {
+        var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+        if (mod != null) mod.debugLog().event("artificial", method, button == 0 ? "left" : "right", action, code, -1);
+    }
     private static String bindState(org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind bind) {
         return java.util.Arrays.toString(bind.getKeyCodes()) + java.util.Arrays.toString(bind.getMouseBtns()) + ":" + bind.getMods() + ";";
     }
@@ -157,27 +167,23 @@ public final class ClickAssistFeature implements ClientFeature {
     }
 
     private boolean allowedWeapon(Item item, boolean spam) {
-        return (spam ? config.spamSwords : config.swords) && item instanceof SwordItem
-                || (spam ? config.spamAxes : config.axes) && item instanceof AxeItem
-                || (spam ? config.spamRods : config.rods) && item instanceof FishingRodItem
-                || (spam ? config.spamSticks : config.sticks) && item == Items.STICK
-                || (spam ? config.spamHoes : config.hoes) && item instanceof HoeItem
-                || (spam ? config.spamShovels : config.shovels) && item instanceof ShovelItem;
+        return ItemAllowlist.allows(item, spam ? config.spamItems : config.assistItems);
     }
 
     private static boolean entityTarget(Minecraft mc) {
         return mc.crosshairTarget != null && mc.crosshairTarget.type == HitResult.Type.ENTITY
                 && mc.crosshairTarget.entity != null;
     }
-    private static boolean swordOrStick(Minecraft mc) {
+    private boolean heldItemAllowed(Minecraft mc) {
         ItemStack stack = mc.player.getItemInHand();
-        return stack != null && (stack.getItem() instanceof SwordItem || stack.getItem() == Items.STICK);
+        return stack != null && ItemAllowlist.allows(stack.getItem(), config.heldItems);
     }
     private HeldClickTrigger.Conditions heldConditions(Minecraft mc) {
         if (!config.heldClickEnabled)
             return new HeldClickTrigger.Conditions(false, false, false, false);
-        boolean available = commonEligible(mc) && !mc.player.hasItemInUse();
-        return new HeldClickTrigger.Conditions(available, entityTarget(mc), swordOrStick(mc), nearbyPlayer(mc));
+        boolean available = commonEligible(mc) && !mc.player.hasItemInUse()
+                && (!config.heldCrouchCancel || !(mc.player.isSneaking() || physicalDown(mc.options.sneakKey.getKeyCode())));
+        return new HeldClickTrigger.Conditions(available, entityTarget(mc), heldItemAllowed(mc), nearbyPlayer(mc));
     }
     private boolean nearbyPlayer(Minecraft mc) {
         var network = mc.getNetworkHandler();
@@ -194,6 +200,7 @@ public final class ClickAssistFeature implements ClientFeature {
         return false;
     }
 
+    public long lastClickNanos() { return engine.lastClickNanos(); }
     public ClickAssistEngine.Cps cps(int button) { return engine.cps(button, System.nanoTime()); }
     public int activeButton() {
         long now = System.nanoTime();
@@ -208,6 +215,7 @@ public final class ClickAssistFeature implements ClientFeature {
                 // Restore real input only in the same active gameplay context.
                 boolean restore = client != null && client.screen == null && client.focused && !client.isPaused();
                 KeyBinding.set(code, restore && physicalDown(code));
+                debug("button_hold", button, "hold_up", code);
             }
             ownsHold[button] = held[button] = false;
             sessions[button].reset();

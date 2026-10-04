@@ -29,6 +29,21 @@ class ClickSessionTest {
             assertEquals(1, high); assertEquals(2, medium); assertEquals(2, low);
         }
     }
+    @Test void rockySessionStartsImmediatelyFinishesOnTimeAndRedrawsAfterRelease() {
+        var random = new java.util.Random(87);
+        var session = new ClickSession(random::nextDouble);
+        var options = new ClickSession.Options(14, 12.5, 9.5, true, 1000, false,
+                8000, 4000, 30, 600, 8, 9, false, 6, 22, 650, 1400, true);
+        double start = session.target(0, true, 1, options);
+        assertTrue(start >= 3.1 && start <= 4.6);
+        double middle = session.target(450 * MS, true, 1, options);
+        assertTrue(middle >= 6.3 && middle <= 9.7);
+        assertEquals(14, session.target(1000 * MS, true, 1, options));
+        assertEquals(0, session.target(1100 * MS, false, 1, options));
+        double restarted = session.target(1200 * MS, true, 1, options);
+        assertTrue(restarted >= 3.1 && restarted <= 4.6);
+        assertNotEquals(start, restarted);
+    }
     @Test void levelChangesBlendInsteadOfJumping() {
         var session = new ClickSession(() -> 0.99);
         session.target(0, true, 5, options(false, false));

@@ -8,7 +8,14 @@ public final class ClickSession {
     public record Options(double high, double medium, double low, boolean ramp, int rampMs,
                           boolean exhaustion, int afterMs, int intervalMs, int chance,
                           int durationMs, double minCps, double maxCps, boolean vary,
-                          double levelVariation, double timingVariation, int minLevelMs, int maxLevelMs) {
+                          double levelVariation, double timingVariation, int minLevelMs, int maxLevelMs, boolean rocky) {
+        public Options(double high, double medium, double low, boolean ramp, int rampMs,
+                       boolean exhaustion, int afterMs, int intervalMs, int chance,
+                       int durationMs, double minCps, double maxCps, boolean vary,
+                       double levelVariation, double timingVariation, int minLevelMs, int maxLevelMs) {
+            this(high, medium, low, ramp, rampMs, exhaustion, afterMs, intervalMs, chance,
+                    durationMs, minCps, maxCps, vary, levelVariation, timingVariation, minLevelMs, maxLevelMs, false);
+        }
         public Options(double high, double medium, double low, boolean ramp, int rampMs,
                        boolean exhaustion, int afterMs, int intervalMs, int chance,
                        int durationMs, double minCps, double maxCps) {
@@ -30,6 +37,7 @@ public final class ClickSession {
         }
     }
     private final DoubleSupplier random;
+    private RockyRamp rockyRamp;
     private final int[] bag = new int[5];
     private boolean active;
     private long started, nextCheck, tiredUntil, slotStart, slotEnd, noiseAt;
@@ -41,6 +49,7 @@ public final class ClickSession {
         if (!clicking) { reset(); return 0; }
         if (!active) {
             active = true; started = now; initial = Math.min(o.high(), Math.max(1, initialRate));
+            rockyRamp = o.ramp() && o.rocky() ? new RockyRamp(this::unit, o.high(), initial) : null;
             previous = initial; nextCheck = now + o.afterMs() * MS;
             noiseAt = now;
         }
@@ -48,7 +57,8 @@ public final class ClickSession {
         long elapsed = Math.max(0, now - started);
         double target;
         if (elapsed < rampTime) {
-            target = initial + (o.high() - initial) * elapsed / rampTime;
+            target = rockyRamp != null ? rockyRamp.target(elapsed / (double) rampTime)
+                    : initial + (o.high() - initial) * elapsed / rampTime;
         } else {
             long steadyTime = elapsed - rampTime;
             int skipped = 0;
@@ -101,7 +111,7 @@ public final class ClickSession {
     }
     public void reset() {
         active = false; tiredUntil = slotStart = slotEnd = 0; bagIndex = 5; cycles = 0;
-        noise = nextNoise = 1;
+        noise = nextNoise = 1; rockyRamp = null;
     }
     private double unit() { return Math.clamp(random.getAsDouble(), 0, Math.nextDown(1.0)); }
     private double triangular() { return unit() + unit() - 1; }

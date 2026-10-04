@@ -83,7 +83,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(4, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(5, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -99,5 +99,24 @@ class ConfigLayoutTest {
         assertFalse(config.heldClickEnabled); assertTrue(config.heldClickEntityOnly);
         assertTrue(config.heldClickRequiresPlayer); assertTrue(config.heldClickWeaponOnly);
         assertEquals(250, config.heldClickDelayMs);
+    }
+    @Test void nativeItemListsCrouchConditionAndDebugFooterAreExposed() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        for (String field : new String[]{"assistItems", "spamItems", "heldItems"}) {
+            String section = field.equals("assistItems") ? "assistWeapons" : field.equals("spamItems") ? "spamWeapons" : "heldWeapons";
+            assertEquals(Visualizer.ItemListVisualizer.class, tree.get(section, field).getMetadata("visualizer"));
+        }
+        assertTrue(java.util.Arrays.asList(config.heldItems).contains("minecraft:beef"));
+        assertNotNull(tree.get("heldFilters", "heldCrouchCancel")); assertTrue(config.heldCrouchCancel);
+        assertNotNull(tree.get("ramp", "rockyRamp")); assertTrue(config.rockyRamp);
+        String lastAdvanced = null;
+        for (Node node : tree.map.values()) if ("Advanced".equals(node.getMetadata("subcategory"))) lastAdvanced=node.getID();
+        assertEquals("debug", lastAdvanced); assertFalse(config.debugEnabled);
+        assertNotNull(tree.get("debug", "clearDebugCache").getMetadata("runnable"));
+        config.configSchema=4; config.mediumCps=11.1; config.swords=false;
+        assertTrue(config.migrateValues()); assertEquals(11.1, config.mediumCps);
+        assertFalse(java.util.Arrays.asList(config.assistItems).contains("minecraft:diamond_sword"));
+        config.heldItems=new String[]{"minecraft:diamond"}; assertFalse(config.migrateValues());
+        assertArrayEquals(new String[]{"minecraft:diamond"}, config.heldItems);
     }
 }

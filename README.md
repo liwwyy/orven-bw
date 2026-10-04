@@ -29,10 +29,11 @@ ClickAssist is arranged in this order:
   separate from mouse-hold conditions. Both sides can run independently.
 - **Mouse button hold click:** visible independent enable and left/right switches.
   Left defaults on, right off. Conditions require an entity target and a living player
-  within four blocks, and Advanced requires a sword/stick by default. The 250-ms timer
+  within four blocks, and Advanced requires a listed item by default. Crouch cancel is on by default; holding
+  your sneak binding or crouching cancels this mode and restarts the eligible timer. The 250-ms timer
   starts after all filters pass, resets when eligibility/input stops, and can be changed.
   Turn off Entity target to allow blocks/air. Optional Instant activation bypasses the
-  delay only with entity + sword/stick + nearby player; the ramp still applies.
+  delay only with entity + allowed item + nearby player; the ramp still applies.
 - **Button Hold:** embedded enable switch with unassigned left/right toggle binds.
   Latches vanilla attack/use state until toggled off and suppresses generated clicks on
   its side. Its synthetic state cannot activate mouse-hold spam.
@@ -40,11 +41,16 @@ ClickAssist is arranged in this order:
   a heart icon. Normal hits are green, combos of three orange, combos of five purple,
   and critical hits gold. Customize combo reset, animation duration and vertical offset.
 - **Advanced:** shared CPS levels, click timing, variation, ramp and exhaustion, plus
-  separate weapon filters for each clicking mode. Groups start collapsed.
+  native editable item lists for each clicking mode, then Debugging at the bottom.
+  Groups start collapsed.
 - **HUD:** visibility and shortcut to OneConfig's HUD editor.
 
 Weapon filters apply to physical/activation-key **left** clicks; their right block-only
-filters remain separate. Mouse-hold sword/stick filtering applies to both selected sides.
+filters remain separate. Mouse-hold item filtering applies to both selected sides.
+Each filter uses OneConfig’s native item picker: add or remove custom items directly.
+Defaults include a sword, stick and raw beef (`minecraft:beef`). Choosing any sword
+enables all swords; other items match exactly. Existing weapon selections migrate to
+item lists once, with raw beef added.
 Right generated clicks pause during blocking, eating and charging to preserve vanilla
 item use. Activation-key spam takes priority over mouse-hold spam on the same side;
 physical assistance runs when neither spam trigger is active. One scheduler runs per side.
@@ -63,7 +69,11 @@ still qualify under this deliberately narrow rule.
 | Low | 9.5 | 40% |
 
 Each side has its own active session using the same Advanced settings. A one-second
-ramp approaches the high level. A shuffled five-slot bag selects one high, two medium
+ramp approaches the high level. **Rocky gradual ramp** is enabled by default: randomized
+bursts and short plateaus start around 3.1–4.6 CPS, reach 6.3–9.7 CPS, then approach
+the configured high level. Each session draws fresh knots. Physical boosting respects
+the manual-rate floor, and low configured targets clamp these example ranges. Disable
+Rocky gradual ramp to use the existing linear rise. A shuffled five-slot bag selects one high, two medium
 and two low levels. With variation enabled, level values vary within ±6%, dwell times
 range from 650–1400 ms, and transitions blend smoothly. Slow rate variation and bounded
 triangular interval variation avoid repeated identical patterns. Exhaustion is applied
@@ -78,7 +88,8 @@ These are bounded timing variations, not a guarantee of human behavior or server
 Schema 4 migrates the previously active spam profile if physical assistance was disabled;
 otherwise it selects the physical profile. Old independent values remain stored as hidden
 compatibility keys. The old activation bind moves to the matching new left/right bind.
-Migration runs once and preserves weapon filters and existing global state.
+Migration runs once and preserves weapon filters and existing global state. Schema 5
+adds the editable item lists while retaining the shared CPS profile.
 
 ## CPS HUD
 
@@ -92,12 +103,52 @@ The calculation follows the busier side's **recent physical + generated** clicks
 final pair always means left total | right total over one second; neither side's total
 is replaced by the dominant side. Selection uses a 250-ms activity window and updates
 at 50-ms intervals, rather than sticking to the last generated button. The uppercase
-`CPS` suffix is optional. Native placement, scale, font, colors and profiles remain editable.
+`CPS` suffix is optional. **Hide when unused** and **HUD hide timeout (ms)** are in
+the HUD’s editor settings; the timeout defaults to 1000 ms after the last counted click.
+A new click shows it immediately, and the editor preview remains visible. Native placement, scale, font, colors and profiles remain editable.
 
 Format placeholders: `{base}`, `{boosted}`, `{total}` follow the dominant side;
 `{left}` and `{right}` are the separate raw totals. Counts are integers even though CPS
 targets support decimals. Vanilla held-use repeats and input injected by other mods are
 not included in this mod's generated-click counter.
+
+## Click debugging and charts
+
+Enable **ClickAssist → Advanced → Debugging → Debug mode** to append to one file:
+`config/orven-bw/click-debug.jsonl`. Debugging is off by default and can record physical
+mouse input while the main mod is disabled, including clicks in game menus. Each restart
+appends a new session ID to the same file. **Clear debug cache** empties that file in
+order with pending writes; recording can then continue in it.
+
+Records include epoch timestamps in milliseconds, monotonic/elapsed nanoseconds, button,
+action, sequence number, session and source. Real mouse press/release events also retain
+LWJGL’s native event timestamp. Remapped keyboard attack/use presses are identified
+separately. Generated events identify `cps_boost`, `spam_click`, `mouse_hold_click`, or
+`button_hold`; Button Hold also records held-state transitions. Recording timestamps
+happen on the input thread; a background writer appends and flushes each record.
+
+Generated `queue` records measure submissions to vanilla’s keybinding queue. They do
+not prove a server accepted an attack. Vanilla repeated use caused by a held key and
+other mods’ injected input are not counted as additional generated events.
+
+Run the dependency-free viewer from this repository:
+
+```sh
+python3 scripts/click_debug_viewer.py
+```
+
+Open <http://127.0.0.1:8765>. By default it looks in:
+`/home/user/.local/share/Polyfrost/OneClient/clusters/1.8.9 OC/config/orven-bw/`.
+For another instance use `--log /path/to/click-debug.jsonl` or `--directory /path/to/config/orven-bw`.
+The viewer reads the log without changing it. It refreshes live and retains the latest
+20,000 records; increase this with `--max-events` for longer comparisons.
+
+Filter by session, button and generating method. Scroll to zoom, drag to pan, or use the
+range sliders. Hover a click for its timestamp and method. Charts show the click timeline,
+rolling one-second CPS, same-button inter-click intervals and a 10-ms interval histogram.
+Physical/generated counts, median interval and interval variation summarize the visible
+range. Export filtered JSON to keep an excerpt. These measurements help inspect timing
+patterns; they cannot determine what a server’s anti-cheat will accept.
 
 ## Hit-effect measurements
 

@@ -200,3 +200,43 @@ The older isolated startup result is historical and does not validate these two 
 The Raven reference was moved without overwriting a destination. Both `.reference/`
 and `icons/` are ignored. The pre-existing `/prompt-record/` ignore edit is preserved
 separately from the new ignore rules when staging the local commit.
+
+## HUD idle, crouch, item lists, rocky ramp and debug viewer (2026-10-04)
+
+A clean build passes with JDK 27 and the exact cached OneConfig 1.2.9 beta APIs:
+
+```sh
+JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build -x prepareOneConfig
+```
+
+The final build runs **47 Java tests**. Added coverage checks HUD inactivity durations,
+fresh clicks and editor-independent timeout logic; crouch/availability cancellation
+before instant bypass; native ItemList metadata and default raw beef; exact custom-item
+matching and any-sword matching; preserving migrated profiles; randomized burst/plateau
+bounds, manual-rate floor, completed ramps, and fresh knots after session release.
+Logger tests cover opt-in behavior, millisecond/method fields, append across restarts,
+session IDs, ordered clear during pending writes, 500 queued records without loss, and
+recovery from an interrupted final line. Debugging is last in the Advanced tree.
+
+The Python viewer passes **3 tests** for file discovery and append, bounded retained
+records, partial/malformed lines, clear/rewrite detection and actual loopback HTTP routes.
+JavaScript passes `node --check`. A real headless Chromium run with 1,800 fixture records
+checks chart rendering, physical/generated counts, source/button filters, wheel zoom,
+drag panning, millisecond hover details, live append and clearing, with no JavaScript
+errors. The viewer and its tests use Python's standard library; Chromium tooling used
+for verification remains in ignored `.reference/`.
+
+The artifact contains 28 Java 25 classes (major 69), Gen 2/intermediary manifest metadata,
+the requested description, and no bundled dependency jars. The mouse-event observer
+retains `remap=false` for LWJGL `Mouse.next` and observes returned real events, including
+GUI input. Generated queue events remain distinct from physical input. SHA256:
+`614b5975a235819f40395caed676116395e7c62c4c4efc020bf88c109abdb92f`.
+
+No fresh Minecraft client launch was performed. Verify the native item picker in the
+actual supported OneConfig 1.2.9 instance, crouch cancellation and resumed activation
+delay, randomized ramp, HUD timeout and immediate return on clicks, and debug records
+from both gameplay and menus. Queue timestamps indicate mod submissions to vanilla,
+not server-confirmed attacks. Vanilla held-use repeats and other mods' input are outside
+this generated-event counter. The persistent log appends at config/orven-bw/click-debug.jsonl;
+Clear debug cache truncates the same file. The viewer defaults to the requested OneClient
+cluster config directory and never modifies its input file.

@@ -118,6 +118,21 @@ public final class OrvenConfig extends Config {
     @Include public int hitEffectDurationMs = 1000;
     @Include public int hitEffectOffsetY = 18;
 
+    @Include public boolean heldCrouchCancel = true;
+    @Include public boolean rockyRamp = true;
+    @Include public boolean debugEnabled = false;
+    @ItemList(title = "Allowed items", description = "Items that enable left physical boosting. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
+    public String[] assistItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
+    @ItemList(title = "Allowed items", description = "Items that enable left spam-key clicking. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
+    public String[] spamItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
+    @ItemList(title = "Allowed items", description = "Items that enable mouse-hold clicking. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
+    public String[] heldItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
+    @Button(title = "Clear debug cache", text = "Clear click log", description = "Erase the existing click-debug.jsonl file. Debugging continues in the same file when enabled.", category = "ClickAssist", subcategory = "Advanced")
+    public void clearDebugCache() {
+        var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+        if (mod != null) mod.debugLog().clear();
+    }
+
     @Info(title = "Global Keybinds", description = "Open settings or toggle every enabled feature with a keybind.")
     public String globalKeysInfo = "";
     @Info(title = "Conditions", description = "Only enables the mod if these conditions are met")
@@ -160,24 +175,12 @@ public final class OrvenConfig extends Config {
         option(collected, "heldClickRight", "Right click", "Generate use clicks while physically holding your configured use binding. Pauses during blocking, eating and charging.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickDelayMs", "Hold activation delay (ms)", "Hold continuously with all enabled filters satisfied for this long before clicking begins. Losing eligibility resets the timer.", Visualizer.SliderVisualizer.class);
         slider(collected, "heldClickDelayMs", 0.0f, 2000.0f, 10.0f);
-        option(collected, "heldClickInstant", "Instant activation", "Skip only the hold delay when an entity is targeted, a sword or stick is held, and a living tab-listed player is nearby. Ramp still applies.", Visualizer.SwitchVisualizer.class);
+        option(collected, "heldClickInstant", "Instant activation", "Skip only the hold delay when an entity is targeted, a listed item is held, and a living tab-listed player is nearby. Ramp still applies.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickRequiresPlayer", "Require nearby player", "Require a living tab-listed player within four blocks. NPCs absent from the tab list do not count.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickEntityOnly", "Require an entity target", "Require an entity under the crosshair. Turn off to allow block and air targets.", Visualizer.SwitchVisualizer.class);
-        option(collected, "heldClickWeaponOnly", "Require sword or stick", "Run mouse-hold clicking only with a sword or stick in your hand. This filter is configured under Advanced weapons.", Visualizer.SwitchVisualizer.class);
-        option(collected, "weaponOnly", "Physical assist: weapons only", "Restrict left physical assistance to the weapon types selected below.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamWeaponOnly", "Keybind spam: weapons only", "Restrict left activation-keybind spam to the weapon types selected below.", Visualizer.SwitchVisualizer.class);
-        option(collected, "swords", "Swords", "Allow swords for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "sticks", "Sticks", "Allow sticks for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "axes", "Axes", "Allow axes for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "rods", "Fishing rods", "Allow fishing rods for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "hoes", "Hoes", "Allow hoes for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "shovels", "Shovels", "Allow shovels for physical assistance when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamSwords", "Swords", "Allow swords for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamSticks", "Sticks", "Allow sticks for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamAxes", "Axes", "Allow axes for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamRods", "Fishing rods", "Allow fishing rods for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamHoes", "Hoes", "Allow hoes for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
-        option(collected, "spamShovels", "Shovels", "Allow shovels for left activation-keybind spam when its weapon filter is enabled.", Visualizer.SwitchVisualizer.class);
+        option(collected, "heldClickWeaponOnly", "Require allowed item", "Run mouse-hold clicking only with an item from its Advanced item list. Any selected sword enables all swords.", Visualizer.SwitchVisualizer.class);
+        option(collected, "weaponOnly", "Physical assist: allowed items only", "Restrict left physical assistance to items in the editable list below.", Visualizer.SwitchVisualizer.class);
+        option(collected, "spamWeaponOnly", "Keybind spam: allowed items only", "Restrict left activation-keybind spam to items in the editable list below.", Visualizer.SwitchVisualizer.class);
         option(collected, "boostDelayMs", "Physical first-boost delay (ms)", "Wait this long before the first generated physical-assist click. Does not delay activation-keybind or mouse-hold spam.", Visualizer.SliderVisualizer.class);
         slider(collected, "boostDelayMs", 0.0f, 150.0f, 5.0f);
         option(collected, "highCps", "High CPS · 20%", "Shared total-rate level, selected for approximately 20% of steady-session time. Manual clicks are preserved.", Visualizer.SliderVisualizer.class);
@@ -221,6 +224,9 @@ public final class OrvenConfig extends Config {
         slider(collected, "hitEffectDurationMs", 300.0f, 3000.0f, 100.0f);
         option(collected, "hitEffectOffsetY", "Text vertical offset", "Distance below the crosshair for health and floating hit text, in scaled screen pixels.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitEffectOffsetY", 0.0f, 100.0f, 1.0f);
+        option(collected, "heldCrouchCancel", "Crouch cancel", "Cancel mouse-hold clicking while your sneak binding is held or your player is crouching. Release crouch to restart its activation timer.", Visualizer.SwitchVisualizer.class);
+        option(collected, "rockyRamp", "Rocky gradual ramp", "Rise in randomized bursts with short plateaus, rather than a straight line. Typical starts are 3.1–4.6 CPS, then 6.3–9.7 CPS before approaching the selected high level.", Visualizer.SwitchVisualizer.class);
+        option(collected, "debugEnabled", "Debug mode", "Append every observed user click and generated queue click to config/orven-bw/click-debug.jsonl, including millisecond timestamps and the generating method. Existing data is retained across restarts.", Visualizer.SwitchVisualizer.class);
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
         Tree root = Tree.tree("orven-bw.json");
@@ -235,7 +241,7 @@ public final class OrvenConfig extends Config {
                 "spamClickThroughBlocks", "spamBlocksOnly", "spamRequiresPlayer", "spamDisableInCreative", "spamOnlyWhileTargeting");
         leaves(root, collected, "ClickAssist", "Mouse button hold click", "heldClickEnabled", "heldClickLeft", "heldClickRight");
         section(root, collected, "heldFilters", "Conditions", "ClickAssist", "Mouse button hold click", null,
-                "heldClickDelayMs", "heldClickInstant", "heldClickRequiresPlayer", "heldClickEntityOnly");
+                "heldClickDelayMs", "heldClickInstant", "heldClickRequiresPlayer", "heldClickEntityOnly", "heldCrouchCancel");
         section(root, collected, "hold", "Button Hold", "ClickAssist", "Button Hold", "holdEnabled", "holdLeftBind", "holdRightBind");
         leaves(root, collected, "ClickAssist", "Hit effects", "hitEffectsEnabled");
         section(root, collected, "hitOptions", "Animation", "ClickAssist", "Hit effects", null,
@@ -244,19 +250,19 @@ public final class OrvenConfig extends Config {
         section(root, collected, "rates", "CPS levels", "ClickAssist", "Advanced", null, "highCps", "mediumCps", "lowCps");
         section(root, collected, "timing", "Click timing", "ClickAssist", "Advanced", "randomizeTiming",
                 "levelVariation", "timingVariation", "levelMinMs", "levelMaxMs", "boostDelayMs");
-        section(root, collected, "ramp", "Gradual ramp", "ClickAssist", "Advanced", "rampEnabled", "rampMs");
+        section(root, collected, "ramp", "Gradual ramp", "ClickAssist", "Advanced", "rampEnabled", "rockyRamp", "rampMs");
         section(root, collected, "exhaustion", "Exhaustion", "ClickAssist", "Advanced", "exhaustionEnabled",
                 "exhaustionAfterMs", "exhaustionIntervalMs", "exhaustionChance", "exhaustionDurationMs", "exhaustedMinCps", "exhaustedMaxCps");
-        section(root, collected, "assistWeapons", "Physical boost weapons", "ClickAssist", "Advanced", "weaponOnly",
-                "swords", "sticks", "axes", "rods", "hoes", "shovels");
-        section(root, collected, "spamWeapons", "Spam click button weapons", "ClickAssist", "Advanced", "spamWeaponOnly",
-                "spamSwords", "spamSticks", "spamAxes", "spamRods", "spamHoes", "spamShovels");
-        section(root, collected, "heldWeapons", "Mouse hold weapons", "ClickAssist", "Advanced", null, "heldClickWeaponOnly");
+        section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems");
+        section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems");
+        section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems");
+        section(root, collected, "debug", "Debugging", "ClickAssist", "Advanced", "debugEnabled", "clearDebugCache");
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
         depends(collected, "scoreboardOnly", "scoreboardWord");
-        depends(collected, "weaponOnly", "swords", "sticks", "axes", "rods", "hoes", "shovels");
-        depends(collected, "spamWeaponOnly", "spamSwords", "spamSticks", "spamAxes", "spamRods", "spamHoes", "spamShovels");
-        depends(collected, "rampEnabled", "rampMs");
+        depends(collected, "weaponOnly", "assistItems");
+        depends(collected, "spamWeaponOnly", "spamItems");
+        depends(collected, "heldClickWeaponOnly", "heldItems");
+        depends(collected, "rampEnabled", "rampMs", "rockyRamp");
         depends(collected, "randomizeTiming", "levelVariation", "timingVariation", "levelMinMs", "levelMaxMs");
         depends(collected, "exhaustionEnabled", "exhaustionAfterMs", "exhaustionIntervalMs", "exhaustionChance",
                 "exhaustionDurationMs", "exhaustedMinCps", "exhaustedMaxCps");
@@ -313,7 +319,8 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 4) return false;
+        if (configSchema >= 5) return false;
+        if (configSchema == 4) { migrateItems(); configSchema = 5; return true; }
         if (configSchema < 2) {
             assistRampEnabled = spamRampEnabled = rampEnabled;
             assistRampMs = spamRampMs = rampMs == 1200 ? 1000 : rampMs;
@@ -349,14 +356,32 @@ public final class OrvenConfig extends Config {
         bind.setMods(spamBind.getMods());
         bind.setDurationNanos(spamBind.getDurationNanos());
         if (spamButton == 1) { spamLeftBind.setKeyCodes(new int[0]); spamLeftBind.setMouseBtns(new int[0]); }
-        configSchema = 4;
+        migrateItems();
+        configSchema = 5;
         return true;
+    }
+    private void migrateItems() {
+        assistItems = legacyItems(swords, sticks, axes, rods, hoes, shovels);
+        spamItems = legacyItems(spamSwords, spamSticks, spamAxes, spamRods, spamHoes, spamShovels);
+    }
+    private static String[] legacyItems(boolean swords, boolean sticks, boolean axes, boolean rods, boolean hoes, boolean shovels) {
+        var items = new java.util.ArrayList<String>();
+        items.add("minecraft:beef");
+        if (swords) items.add("minecraft:diamond_sword");
+        if (sticks) items.add("minecraft:stick");
+        if (rods) items.add("minecraft:fishing_rod");
+        for (String material : new String[]{"wooden", "stone", "iron", "golden", "diamond"}) {
+            if (axes) items.add("minecraft:" + material + "_axe");
+            if (hoes) items.add("minecraft:" + material + "_hoe");
+            if (shovels) items.add("minecraft:" + material + "_shovel");
+        }
+        return items.toArray(String[]::new);
     }
     public ClickSession.Options rateOptions() {
         return new ClickSession.Options(highCps, mediumCps, lowCps, rampEnabled, rampMs,
                 exhaustionEnabled, exhaustionAfterMs, exhaustionIntervalMs, exhaustionChance,
                 exhaustionDurationMs, exhaustedMinCps, exhaustedMaxCps,
-                randomizeTiming, levelVariation, timingVariation, levelMinMs, levelMaxMs);
+                randomizeTiming, levelVariation, timingVariation, levelMinMs, levelMaxMs, rockyRamp);
     }
     public ClickSession.Options rateOptions(boolean ignored) { return rateOptions(); }
     public static void openSettings() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "General")); }

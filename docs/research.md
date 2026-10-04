@@ -133,3 +133,49 @@ Both spam triggers use the same timing/profile implementation with one source pe
 
 Schema 3 retains field-sharing hidden root aliases, so prior bindings and profile values
 survive the tree reorganization. Schema 2 advances without rerunning legacy migration.
+
+## Full settings/HUD redesign and hit effects (2026-10-04)
+
+Queried the **oneconfig-v1 MCP** first, including its official
+[Buttons](https://docsv1.polyfrost.org/configuration/available-options/buttons),
+[Decorations](https://docsv1.polyfrost.org/configuration/available-options/decorations)
+and [Keybind option](https://docsv1.polyfrost.org/configuration/available-options/keybind-option)
+references. Its answer explicitly could not verify the newer tree/route APIs.
+Cross-checked with [DeepWiki](https://deepwiki.com/search/verify-current-oneconfig-v1-be_992cd713-7e22-4148-9874-00c6dad51d78)
+and the OneConfig source/cached exact 1.2.9 bytecode.
+
+Verified `@Button.icon`, collector icon/runnable metadata, SettingLabel icon rendering,
+`OneConfigUI.open(ModConfigRoute)`, Info headings and native keybind actions. The docs'
+method-style Info example does not match the field annotation used by this SDK.
+Include-only fields begin hidden, so visible options explicitly remove hidden metadata
+and get supported Visualizer classes and descriptive title/description metadata.
+Node.description is a public field in 1.2.9, not a getDescription method or ordinary
+metadata entry. Null key/mouse arrays on unassigned/mouse-only SDK binds are normalized
+when copying old bindings, while new callbacks remain attached to their own sides.
+
+The layout now uses visible top-level mod/feature switches, two categories in insertion
+order and sibling collapsed trees. All timing parameters are shared. Schema 4 chooses
+an active spam profile when physical assistance was disabled, otherwise the physical
+profile; previous independent values remain in hidden keys. Left/right keybind spam has
+independent held/latched state; mouse-hold spam is independently enabled.
+
+The HUD's default calculation follows combined recent input (250 ms), with fixed
+left | right one-second totals and optional uppercase CPS. This is modeled after
+EvergreenHUD's paired totals without locking the calculation to the last generated side.
+
+Inspected the user-supplied `.reference/hit_show.java`; it is a partial Forge rendering
+fragment, not a complete hit detector. New code independently implements reticle-relative
+health text and a sliding/fading hit/damage popup without its heart icon. Feather MCP
+verified ClientPlayerInteractionManager.attackEntity (m_41462154) and GameGui.render
+(m_94668477). Generated Minecraft source verified their signatures, attack packet flow,
+TextRenderer.drawWithShadow, Window dimensions, health access and vanilla critical
+eligibility conditions. Attacks open a 750-ms window for observed health decreases;
+health updates cannot prove attribution or divide coalesced hits. No Forge code was
+copied into the Ornithe implementation.
+
+Randomized sessions select weighted CPS levels, bounded level offsets and dwell times,
+blend transitions, apply slow correlated rate variation, then apply exhaustion last.
+The fractional scheduler adds symmetric triangular interval variation. Configurable
+bounds, tick dispatch and stall cancellation remain; this is not a human/anti-cheat guarantee.
+Raven-bS is now under ignored `.reference/raven-Bs`; original icons are ignored under
+`icons/`, with the supplied ClickAssist icon copied into tracked runtime resources.

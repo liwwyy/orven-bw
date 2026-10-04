@@ -22,8 +22,8 @@ public final class ClickAssistFeature implements ClientFeature {
     private final HeldClickTrigger[] heldTriggers = {new HeldClickTrigger(), new HeldClickTrigger()};
     private final boolean[] held = new boolean[2];
     private final boolean[] ownsHold = new boolean[2];
-    private boolean spamPressed, spamLatched;
-    private int lastMode = -1, lastButton = -1;
+    private final boolean[] spamPressed = new boolean[2], spamLatched = new boolean[2];
+    private int lastMode = -1;
     private int activeButton;
     private Minecraft client;
     private String bindSignature;
@@ -33,15 +33,21 @@ public final class ClickAssistFeature implements ClientFeature {
     public void activation(int action, boolean down) {
         Minecraft mc = Minecraft.getInstance();
         if (!commonEligible(mc) || mc.screen != null || !mc.focused || mc.isPaused()) return;
-        if (lastMode != config.spamMode || lastButton != config.spamButton) {
-            spamPressed = spamLatched = false;
-            lastMode = config.spamMode; lastButton = config.spamButton;
+        if (lastMode != config.spamMode) {
+            clearSpam();
+            lastMode = config.spamMode;
         }
-        if (action == 0) {
+        if (action == 0 || action == 3 || action == 4) {
             if (!config.spamEnabled) return;
-            spamPressed = down;
-            if (down && config.spamMode == 1) spamLatched = !spamLatched;
-        } else if (down && config.holdEnabled) held[action - 1] = !held[action - 1];
+            int button = action == 0 ? config.spamButton : action == 3 ? 0 : 1;
+            boolean wasPressed = spamPressed[button];
+            spamPressed[button] = down;
+            if (down && !wasPressed && config.spamMode == 1) spamLatched[button] = !spamLatched[button];
+        } else if (down && config.holdEnabled && action >= 1 && action <= 2) held[action - 1] = !held[action - 1];
+    }
+    private void clearSpam() {
+        java.util.Arrays.fill(spamPressed, false);
+        java.util.Arrays.fill(spamLatched, false);
     }
 
     public ClickAssistFeature(OrvenConfig config) { this.config = config; }
@@ -56,19 +62,18 @@ public final class ClickAssistFeature implements ClientFeature {
     @Override public void beforeInteractions(Minecraft mc) {
         syncBindings(mc);
         client = mc;
-        String signature = bindState(config.spamBind) + bindState(config.holdLeftBind) + bindState(config.holdRightBind);
+        String signature = bindState(config.spamLeftBind) + bindState(config.spamRightBind) + bindState(config.holdLeftBind) + bindState(config.holdRightBind);
         if (bindSignature != null && !bindSignature.equals(signature)) reset();
         bindSignature = signature;
         if (!commonEligible(mc)) { reset(); return; }
-        if (lastMode != config.spamMode || lastButton != config.spamButton) {
-            spamPressed = spamLatched = false;
-            for (ClickSession session : sessions) session.reset();
-            lastMode = config.spamMode; lastButton = config.spamButton;
+        if (lastMode != config.spamMode) {
+            clearSpam();
+            for (int button = 0; button < 2; button++) { sessions[button].reset(); engine.cancel(button); }
+            lastMode = config.spamMode;
         }
-        if (!config.spamEnabled) spamPressed = spamLatched = false;
+        if (!config.spamEnabled) clearSpam();
         if (!config.holdEnabled) held[0] = held[1] = false;
         long now = System.nanoTime();
-        boolean spam = config.spamEnabled && (config.spamMode == 1 ? spamLatched : spamPressed);
         var conditions = heldConditions(mc);
         boolean heldPermitted = conditions.allows(config.heldClickEntityOnly, config.heldClickWeaponOnly, config.heldClickRequiresPlayer);
         for (int button = 0; button <= 1; button++) {
@@ -81,9 +86,9 @@ public final class ClickAssistFeature implements ClientFeature {
                 KeyBinding.set(code, physicalDown(code));
                 ownsHold[button] = false;
             }
-            boolean explicitSpam = spam && button == config.spamButton;
+            boolean explicitSpam = config.spamEnabled && (config.spamMode == 1 ? spamLatched[button] : spamPressed[button]);
             boolean heldSpam = heldTriggers[button].active(now, physicalDown(code),
-                    config.spamEnabled && config.heldClickEnabled && !held[button]
+                    config.heldClickEnabled && !held[button]
                             && (button == 0 ? config.heldClickLeft : config.heldClickRight)
                             && heldPermitted,
                     config.heldClickDelayMs * 1_000_000L,
@@ -92,7 +97,7 @@ public final class ClickAssistFeature implements ClientFeature {
                     config.enabled && engine.manuallyActive(button, now, config.activationCps));
             boolean spamming = source == 1 || source == 2;
             boolean clicking = source >= 0 && (source == 2 ? heldPermitted : eligible(mc, button, spamming));
-            var profile = config.rateOptions(spamming);
+            var profile = config.rateOptions();
             if (sources[button] != source || !profile.equals(profiles[button])) {
                 sessions[button].reset(); engine.cancel(button);
                 sources[button] = source; profiles[button] = profile;
@@ -101,8 +106,8 @@ public final class ClickAssistFeature implements ClientFeature {
             double target = sessions[button].target(now, clicking, spamming ? 5 : base + 1, profile);
             double generated = Math.max(0, target - base);
             boolean clicked = engine.poll(button, now, generated, clicking,
-                    spamming ? config.spamVaryTiming : config.assistVaryTiming,
-                    spamming ? 0 : config.boostDelayMs * 1_000_000L);
+                    config.randomizeTiming,
+                    spamming ? 0 : config.boostDelayMs * 1_000_000L, config.timingVariation / 100.0);
             if (clicked) {
                 KeyBinding.click(code);
                 activeButton = button;
@@ -169,10 +174,9 @@ public final class ClickAssistFeature implements ClientFeature {
         return stack != null && (stack.getItem() instanceof SwordItem || stack.getItem() == Items.STICK);
     }
     private HeldClickTrigger.Conditions heldConditions(Minecraft mc) {
-        if (!config.spamEnabled || !config.heldClickEnabled)
+        if (!config.heldClickEnabled)
             return new HeldClickTrigger.Conditions(false, false, false, false);
-        boolean available = commonEligible(mc) && !mc.player.hasItemInUse()
-                && !(config.spamDisableInCreative && mc.player.abilities.creativeMode);
+        boolean available = commonEligible(mc) && !mc.player.hasItemInUse();
         return new HeldClickTrigger.Conditions(available, entityTarget(mc), swordOrStick(mc), nearbyPlayer(mc));
     }
     private boolean nearbyPlayer(Minecraft mc) {
@@ -191,7 +195,11 @@ public final class ClickAssistFeature implements ClientFeature {
     }
 
     public ClickAssistEngine.Cps cps(int button) { return engine.cps(button, System.nanoTime()); }
-    public int activeButton() { return activeButton; }
+    public int activeButton() {
+        long now = System.nanoTime();
+        activeButton = engine.dominantButton(now, activeButton);
+        return activeButton;
+    }
     @Override public void reset() {
         engine.reset();
         for (int button = 0; button < 2; button++) {
@@ -206,6 +214,6 @@ public final class ClickAssistFeature implements ClientFeature {
             heldTriggers[button].reset();
             sources[button] = -1; profiles[button] = null;
         }
-        spamPressed = spamLatched = false;
+        clearSpam();
     }
 }

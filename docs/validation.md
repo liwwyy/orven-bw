@@ -164,3 +164,39 @@ eligibility only with Entity target off; nearby players with matching tab userna
 item-use preservation; simultaneous sources and Button Hold suppression; context,
 rebind and profile cleanup. Previously documented isolated startup is historical.
 Local Git commits work in this session. The user's existing .gitignore edit stays unstaged.
+
+## Full settings/HUD/hit-effects build (latest, 2026-10-04)
+
+A clean Gradle build passed with JDK 27 targeting Java 25 and the cached exact
+OneConfig 1.2.9 APIs. The original beta jar remains absent at its old path:
+
+```sh
+JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build -x prepareOneConfig
+```
+
+All **37 tests** pass. Coverage now includes General-first categories, visible master
+switches and independent left/right bindings, every visible option's title/description,
+icon resource/metadata, native accordion recognition, shared parameters and reactive
+conditions, one-time legacy/profile/bind migration including null SDK arrays, randomized
+bounded rates and final exhaustion cap, quick recent-output HUD dominance despite stale
+one-second counts, fixed raw left/right totals and optional uppercase suffix, attempted
+versus observed hits, confirmation expiry, healing, target/context/combo resets, critical
+colors and coalesced health updates. A longer popup survives logical combo expiry.
+
+Artifact checks: 22 Java 25 mod classes (major 69), Gen 2/intermediary manifest, correct
+description, supplied SVG geometry with normalized line endings and no bundled dependencies. The original four
+input injector method/target/ordinal annotations match the previous Loom-built baseline.
+Both new hit-effect injectors remap to the MCP-verified intermediary methods.
+SHA256: `4d64a7325a61f53786a43ec036097dd8647e9b711a08d771466e58db84e4963a`.
+
+No fresh client launch or visual/gameplay test was performed. Verify the icon and page
+shortcut, always-visible enable switches, global toggle while disabled, separate spam
+binds and Hold/Toggle mode, independently enabled mouse-hold conditions, shared Advanced
+controls, reactive hiding, quick calculation-side changes with both totals, CPS suffix,
+and hit-effect positioning/fade/color/health in the real supported 1.2.9 instance. Actual
+health synchronization and hit attribution are server-dependent as documented in README.
+The older isolated startup result is historical and does not validate these two new hooks.
+
+The Raven reference was moved without overwriting a destination. Both `.reference/`
+and `icons/` are ignored. The pre-existing `/prompt-record/` ignore edit is preserved
+separately from the new ignore rules when staging the local commit.

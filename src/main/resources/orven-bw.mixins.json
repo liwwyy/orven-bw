@@ -2,6 +2,12 @@
   "required": true,
   "package": "io.github.liwwyy.orvenbw.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["MinecraftInputMixin"],
-  "injectors": {"defaultRequire": 1}
+  "client": [
+    "MinecraftInputMixin",
+    "HitEffectsMixin",
+    "HitEffectsRenderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

@@ -5,17 +5,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CpsFormatTest {
-    @Test void formatsTheCurrentButtonAfterTheTotal() {
-        assertEquals("7 + 6 = 13 R-Cps", CpsFormat.render(CpsFormat.DEFAULT, new Cps(7, 6), 1));
-        assertEquals("5 + 4 = 9 L-Cps", CpsFormat.render(CpsFormat.DEFAULT, new Cps(5, 4), 0));
+    @Test void dominantCalculationChangesWhileRawLeftRightOrderDoesNot() {
+        var left = new Cps(7, 6); var right = new Cps(3, 1);
+        assertEquals("7 + 6 = 13 | 4 CPS", CpsFormat.render(CpsFormat.DEFAULT, left, right, 0, true));
+        assertEquals("3 + 1 = 13 | 4 CPS", CpsFormat.render(CpsFormat.DEFAULT, left, right, 1, true));
+        assertEquals("3 + 1 = 13 | 4", CpsFormat.render(CpsFormat.DEFAULT, left, right, 1, false));
     }
-    @Test void oldDefaultsAndOldLetterPlacementMigrateWithoutDuplicateSuffixes() {
-        assertEquals("7 + 6 = 13 R-Cps", CpsFormat.render("{base} + {boosted} = {total}", new Cps(7, 6), 1));
-        assertEquals("13 L-Cps", CpsFormat.render("{button}{total} CPS", new Cps(7, 6), 0));
+    @Test void oldDefaultMigratesAndOptionalUppercaseSuffixNeverDuplicates() {
+        var left = new Cps(7, 6); var right = new Cps(3, 1);
+        assertEquals("7 + 6 = 13 | 4 CPS", CpsFormat.render("{base} + {boosted} = {total} {button}-Cps", left, right, 0, true));
+        assertEquals("13 | 4 CPS", CpsFormat.render("{left} | {right} Cps", left, right, 0, true));
+        assertEquals("13 | 4", CpsFormat.render("{left} | {right} CPS", left, right, 0, false));
         assertEquals("", CpsFormat.suffix(" CPS"));
         assertEquals(" clicks", CpsFormat.suffix(" clicks"));
     }
-    @Test void preservesCustomFormatsWithExplicitButtonPlacement() {
-        assertEquals("R: 6 extra / 13", CpsFormat.render("{button}: {boosted} extra / {total}", new Cps(7, 6), 1));
+    @Test void customCalculationUsesTheDominantSide() {
+        assertEquals("1 extra / 4", CpsFormat.render("{boosted} extra / {total}", new Cps(7, 6), new Cps(3, 1), 1, false));
     }
 }

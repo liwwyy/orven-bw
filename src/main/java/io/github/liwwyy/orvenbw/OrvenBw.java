@@ -4,6 +4,7 @@ import io.github.liwwyy.orvenbw.config.OrvenConfig;
 import io.github.liwwyy.orvenbw.feature.FeatureRegistry;
 import io.github.liwwyy.orvenbw.feature.clickassist.ClickAssistFeature;
 import io.github.liwwyy.orvenbw.hud.ClickAssistHud;
+import io.github.liwwyy.orvenbw.feature.hiteffects.HitEffectsFeature;
 import net.fabricmc.api.ClientModInitializer;
 import org.polyfrost.oneconfig.api.hud.v1.HudManager;
 import org.slf4j.Logger;
@@ -15,16 +16,21 @@ public final class OrvenBw implements ClientModInitializer {
     private final FeatureRegistry features = new FeatureRegistry();
     private OrvenConfig config;
     private ClickAssistFeature clickAssist;
+    private HitEffectsFeature hitEffects;
 
     @Override public void onInitializeClient() {
         config = new OrvenConfig();
         config.preload();
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);
-        org.polyfrost.oneconfig.api.config.v1.ConfigManager.addProfileChangeListener(name -> { clickAssist.reset(); config.migrate(); });
+        hitEffects = new HitEffectsFeature(config);
+        features.register(hitEffects);
+        org.polyfrost.oneconfig.api.config.v1.ConfigManager.addProfileChangeListener(name -> { features.reset(); config.migrate(); });
         instance = this;
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.settingsBind);
-        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.spamBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.spamLeftBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.spamRightBind);
+        org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.toggleModBind);
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdLeftBind);
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdRightBind);
         HudManager.register(new ClickAssistHud(), "orven-bw.json", "combat");
@@ -34,5 +40,6 @@ public final class OrvenBw implements ClientModInitializer {
     public static OrvenBw instance() { return instance; }
     public FeatureRegistry features() { return features; }
     public OrvenConfig config() { return config; }
+    public HitEffectsFeature hitEffects() { return hitEffects; }
     public ClickAssistFeature clickAssist() { return clickAssist; }
 }

@@ -10,6 +10,7 @@ public final class FeatureRegistry {
     private Object player;
     private boolean active;
 
+    public void reset() { for (ClientFeature feature : features) feature.reset(); }
     public void checkContext(Minecraft client) { syncContext(client); }
     public void register(ClientFeature feature) { features.add(feature); }
     public void onInput(Minecraft client, int keyCode) {

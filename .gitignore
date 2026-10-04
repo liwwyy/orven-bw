@@ -1,5 +1,4 @@
 prompt.md
-/raven-Bs/
 /.reference/
 /.gradle/
 /build/
@@ -7,3 +6,4 @@ prompt.md
 /.idea/
 /.vscode/
 *.iml
+/icons/

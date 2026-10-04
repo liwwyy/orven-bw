@@ -53,6 +53,9 @@ public final class ClickAssistEngine {
 
     /** At most one click per tick; a stall discards accrued work. Same scheduler for hold/toggle spam. */
     public boolean poll(int button, long now, double generatedRate, boolean eligible, boolean vary, long initialDelay) {
+        return poll(button, now, generatedRate, eligible, vary, initialDelay, 0.15);
+    }
+    public boolean poll(int button, long now, double generatedRate, boolean eligible, boolean vary, long initialDelay, double variation) {
         Channel c = channel(button);
         prune(c, now);
         if (!eligible || !Double.isFinite(generatedRate) || generatedRate <= 0) {
@@ -61,22 +64,39 @@ public final class ClickAssistEngine {
         double rate = Math.min(20, generatedRate);
         if (!c.running) {
             c.running = true; c.lastPoll = now + Math.max(0, initialDelay);
-            c.threshold = intervalWeight(vary); c.credit = c.threshold;
+            c.threshold = intervalWeight(vary, variation); c.credit = c.threshold;
         }
         if (now < c.lastPoll) return false;
         long elapsed = now - c.lastPoll;
         c.lastPoll = now;
         if (elapsed > 250_000_000L) {
-            c.credit = 0; c.threshold = intervalWeight(vary); return false;
+            c.credit = 0; c.threshold = intervalWeight(vary, variation); return false;
         }
         c.credit = Math.min(c.threshold + 1, c.credit + Math.min(elapsed, 50_000_000L) * rate / SECOND);
         if (c.credit + 1e-9 < c.threshold) return false;
         c.credit -= c.threshold;
-        c.threshold = intervalWeight(vary);
+        c.threshold = intervalWeight(vary, variation);
         c.boosted.addLast(now);
         return true;
     }
-    private double intervalWeight(boolean vary) { return vary ? 0.85 + random.getAsDouble() * 0.3 : 1; }
+    private double intervalWeight(boolean vary, double variation) {
+        double spread = Double.isFinite(variation) ? Math.clamp(variation, 0, 0.35) : 0;
+        // Symmetric triangular jitter avoids repeatedly hitting the extreme interval bounds.
+        return vary ? 1 + (random.getAsDouble() + random.getAsDouble() - 1) * spread : 1;
+    }
+    public int dominantButton(long now, int previous) {
+        Cps left = cps(0, now), right = cps(1, now);
+        int l = recent(channels[0], now), r = recent(channels[1], now);
+        if (l != r) return l > r ? 0 : 1;
+        if (left.total() != right.total()) return left.total() > right.total() ? 0 : 1;
+        return previous == 1 ? 1 : 0;
+    }
+    private static int recent(Channel channel, long now) {
+        int count = 0;
+        for (long time : channel.physical) if (now - time < 250_000_000L) count++;
+        for (long time : channel.boosted) if (now - time < 250_000_000L) count++;
+        return count;
+    }
     public void cancel(int button) { Channel c = channel(button); c.running = false; c.credit = 0; }
     public Cps cps(int button, long now) {
         Channel c = channel(button); prune(c, now);

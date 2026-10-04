@@ -52,4 +52,19 @@ class ClickSessionTest {
         assertEquals(8.5, assist.target(8000 * MS, true, 6, options(true, true)));
         assertTrue(spam.target(8000 * MS, true, 5, options(true, true)) >= 9.5);
     }
+    @Test void variedProfileIsBoundedNonPeriodicAndExhaustionCapsItLast() {
+        var random = new java.util.Random(42);
+        var session = new ClickSession(random::nextDouble);
+        var varied = new ClickSession.Options(14, 12.5, 9.5, true, 1000, true,
+                8000, 4000, 100, 600, 8, 9, true, 6, 22, 650, 1400);
+        var values = new java.util.HashSet<Double>();
+        for (long t = 0; t < 20_000 * MS; t += 50 * MS) {
+            double target = session.target(t, true, 5, varied);
+            assertTrue(target >= 1 && target <= 20);
+            if (t > 1500 * MS && t < 8000 * MS) values.add(target);
+            if (t >= 8000 * MS && t < 8600 * MS) assertTrue(target >= 8 && target <= 9);
+        }
+        assertTrue(values.size() > 50, "Variation must change fractional rates beyond three fixed plateaus");
+        session.reset(); assertEquals(5, session.target(25_000 * MS, true, 5, varied));
+    }
 }

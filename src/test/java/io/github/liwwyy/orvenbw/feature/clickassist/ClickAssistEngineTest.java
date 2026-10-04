@@ -93,4 +93,15 @@ class ClickAssistEngineTest {
         assertTrue(engine.manuallyActive(0, 3200 * MS, 4));
         assertEquals(5, engine.manualRate(0, 3200 * MS));
     }
+    @Test void hudDominanceSwitchesFromRecentCombinedOutputBeforeOldCountsExpire() {
+        var engine = new ClickAssistEngine(() -> 0.5);
+        for (long t = 0; t <= 400 * MS; t += 50 * MS) engine.physicalClick(0, t);
+        assertEquals(0, engine.dominantButton(400 * MS, 1));
+        engine.physicalClick(1, 600 * MS); engine.physicalClick(1, 650 * MS);
+        assertEquals(1, engine.dominantButton(650 * MS, 0));
+        assertTrue(engine.cps(0, 650 * MS).total() > engine.cps(1, 650 * MS).total());
+        for (long t = 700 * MS; t <= 900 * MS; t += 50 * MS) engine.poll(0, t, 20, true, false, 0);
+        assertEquals(0, engine.dominantButton(900 * MS, 1));
+        engine.reset(); assertEquals(1, engine.dominantButton(1000 * MS, 1));
+    }
 }

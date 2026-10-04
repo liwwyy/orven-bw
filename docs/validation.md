@@ -261,3 +261,57 @@ builds publish a new version with the runtime jar and checksum after successful 
 Existing releases are retained, so bump mod_version for each new release. Tags must
 match the version property. Pull requests only produce build artifacts.
 README.md is empty; project/build notes are now in README_LOCAL.md.
+
+## Recording prerelease branch (2026-10-04)
+
+Branch debug/click-recording builds version 0.2.1 with the same mod ID and jar naming
+format. Logging starts on; the main switch, all optional feature switches and HUD start
+off. Its config ID is orven-bw-recording.json and its HUD ID is
+orven-bw-recording-hud.json. SDK routes, tree construction and HUD registration use the
+recording config ID. Saved choices are retained, rather than reset on every launch.
+
+Clean JDK 27/Java 25 build passes **49 Java tests**. Added coverage checks recording-only
+defaults, unique config identity, keeping deliberate changes through migration, logging
+with master/assist off, recording/version header metadata and lossless native timestamps.
+**6 Python tests** check native 5/17-ms deltas despite identical observation times,
+legacy numeric timestamps, clock resets, missing-time fallback, retention/clear resets,
+session identity, live append and existing HTTP/file handling. JavaScript syntax and
+branch workflow actionlint checks pass.
+
+Headless Chromium checks the earlier 1,800-row observation fixture, then a recording
+fixture. The recording fixture automatically selects native timing, excludes generated
+clicks in that mode, displays the exact 5/17-ms intervals and 11-ms median, switches back
+to observation timing with generated input included, and labels missing native timing
+without joining an interval across the gap. Rendering, source/side filters, wheel zoom,
+panning, hover details, live append and clearing pass with no JavaScript errors.
+
+An isolated real Minecraft 1.8.9 client was launched using the installed OneClient
+OneConfig 1.2.19, Compose 1.0.5, Kotlin 1.14.1 and Pylon 0.1.9 dependencies. The test
+uses Java 25, Fabric Loader 0.19.5, an offline test identity and a fresh world under
+.reference/recording-smoke, without modifying the active OneClient cluster. The minimal
+launcher required Pylon; its virtual-display run uses SDL_VIDEO_FORCE_EGL=1 to avoid
+unsupported Xvfb VSync, and the verified Fabric fabric.fixPackageAccess=true flag for
+Gen 2 package access. These are isolated launch-environment adjustments, not changes
+to the mod or installation requirements for OneClient.
+
+The real mouse observer transforms successfully. Thirty controlled XTest mouse presses
+produce exactly 60 press/release records (40 left, 20 right), with native timestamps and
+zero artificial events while all switches are off. The first twenty left presses have a
+45.027-ms native median, versus 46 ms for observation timing. These are automation test
+inputs, not a claimed human baseline. Gameplay mouse input is also recorded in the fresh
+singleplayer world. P opens the recording settings while the main switch is off, and the
+settings permit enabling the master switch while all clicking utilities remain off.
+Across the gameplay/menu tests, 149 input rows contain no artificial events.
+
+A regular orven-bw.json fixture with enabled features does not enable the fresh recording
+config. After an actual UI change to the recording master switch, a subsequent restart
+keeps master on, optional features/HUD off and logging on. Mouse input appends a third
+session to the same debug file, retaining existing records and recording/version headers.
+The runtime jar SHA256 is
+6ab2d31ef44dd4ee576c7e9d90f67f4834e121a571bfc3370029e35d1dda7d08.
+It retains Gen 2/intermediary metadata and bundles no dependencies.
+
+The recording workflow publishes v{mod_version}-recording as a prerelease with
+--latest=false, preserving the normal latest release. The friend-facing installation,
+log-sharing and optional-settings instructions are in docs/INSTALL_RECORDING.md and
+used as the release body. README.md remains empty.

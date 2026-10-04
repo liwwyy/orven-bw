@@ -8,6 +8,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigLayoutTest {
     private Tree tree(OrvenConfig config) { return config.makeTree(); }
+    @Test void recordingStartsWithOnlyLoggingAndKeepsDeliberateChanges() {
+        var config = new OrvenConfig();
+        assertTrue(config.debugEnabled);
+        assertFalse(config.modEnabled); assertFalse(config.enabled);
+        assertFalse(config.spamEnabled); assertFalse(config.heldClickEnabled);
+        assertFalse(config.holdEnabled); assertFalse(config.hitEffectsEnabled); assertFalse(config.showHud);
+        assertEquals("orven-bw-recording.json", config.makeTree().getID());
+        assertNotEquals("orven-bw.json", OrvenConfig.CONFIG_ID);
+        // Initialization/migration must not force the defaults over saved recording choices.
+        config.configSchema = 5;
+        config.modEnabled = config.spamEnabled = config.showHud = true;
+        config.debugEnabled = false;
+        assertFalse(config.migrateValues());
+        assertTrue(config.modEnabled); assertTrue(config.spamEnabled); assertTrue(config.showHud);
+        assertFalse(config.debugEnabled);
+    }
     @Test void generalComesFirstWithVisibleEnableAndIconShortcut() {
         var config = new OrvenConfig(); Tree tree = tree(config);
         assertFalse(config.modEnabled);
@@ -111,7 +127,7 @@ class ConfigLayoutTest {
         assertNotNull(tree.get("ramp", "rockyRamp")); assertTrue(config.rockyRamp);
         String lastAdvanced = null;
         for (Node node : tree.map.values()) if ("Advanced".equals(node.getMetadata("subcategory"))) lastAdvanced=node.getID();
-        assertEquals("debug", lastAdvanced); assertFalse(config.debugEnabled);
+        assertEquals("debug", lastAdvanced); assertTrue(config.debugEnabled);
         assertNotNull(tree.get("debug", "clearDebugCache").getMetadata("runnable"));
         config.configSchema=4; config.mediumCps=11.1; config.swords=false;
         assertTrue(config.migrateValues()); assertEquals(11.1, config.mediumCps);

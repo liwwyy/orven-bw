@@ -18,7 +18,7 @@ public final class ClickAssistHud extends TextHud {
     public boolean hideWhenIdle = false;
     @Slider(title = "HUD hide timeout (ms)", description = "Time since the last click before hiding. New input shows the HUD immediately.", min = 0, max = 10000, step = 100)
     public int hideTimeoutMs = 1000;
-    public ClickAssistHud() { super("orven-bw-clickassist-hud.json", "ClickAssist CPS", Hud.Category.getCOMBAT(), "", ""); }
+    public ClickAssistHud() { super("orven-bw-recording-hud.json", "ClickAssist CPS", Hud.Category.getCOMBAT(), "", ""); }
     @Override public long updateFrequency() { return 50_000_000L; }
     @Override protected String getText() {
         if (OrvenBw.instance() == null || HudManager.INSTANCE.isEditing())

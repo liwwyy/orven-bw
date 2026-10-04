@@ -35,6 +35,24 @@ class ClickDebugLogTest {
         assertTrue(rows.get(2).get("elapsed_ns").getAsLong() >= rows.get(1).get("elapsed_ns").getAsLong());
         assertTrue(errors.isEmpty());
     }
+    @Test void recordingMetadataAndNativePrecisionArePreservedWhileFeaturesAreOff() throws Exception {
+        Path path = temp.resolve("click-debug.jsonl");
+        var config = new io.github.liwwyy.orvenbw.config.OrvenConfig();
+        long nativeNanos = 1_800_000_000_000_123_457L;
+        try (var log = new ClickDebugLog(path, () -> config.debugEnabled, failure -> fail(failure), "0.2.1+mc1.8.9")) {
+            assertFalse(config.modEnabled); assertFalse(config.enabled);
+            log.event("physical", "mouse", "left", "press", -100, nativeNanos);
+            log.event("physical", "mouse", "left", "release", -100, nativeNanos + 5_000_000L);
+        }
+        var lines = Files.readAllLines(path);
+        var header = new JsonParser().parse(lines.get(0)).getAsJsonObject();
+        assertEquals("recording", header.get("build_flavor").getAsString());
+        assertEquals("0.2.1+mc1.8.9", header.get("mod_version").getAsString());
+        assertEquals(3, lines.size());
+        var click = new JsonParser().parse(lines.get(1)).getAsJsonObject();
+        assertEquals(Long.toString(nativeNanos), click.get("native_event_ns_text").getAsString());
+        assertFalse(Files.readString(path).contains("artificial"));
+    }
     @Test void clearIsOrderedWithPendingWritesAndUsesTheSameFile() throws Exception {
         Path path = temp.resolve("click-debug.jsonl");
         try (var log = new ClickDebugLog(path, () -> true, failure -> {})) {

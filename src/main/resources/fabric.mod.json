@@ -2,10 +2,11 @@
   "schemaVersion": 1,
   "id": "orven-bw",
   "version": "${version}",
-  "name": "orven-bw",
-  "description": "Bedwars/PvP utils to lower your cortisol!",
+  "name": "orven-bw — Click Recording",
+  "description": "Physical click timing recorder. Logging starts automatically; optional utilities are disabled by default.",
   "authors": ["liwwyy"],
   "environment": "client",
+  "custom": {"orvenbw:build_flavor": "recording"},
   "entrypoints": {"client": ["io.github.liwwyy.orvenbw.OrvenBw"]},
   "mixins": ["orven-bw.mixins.json"],
   "depends": {

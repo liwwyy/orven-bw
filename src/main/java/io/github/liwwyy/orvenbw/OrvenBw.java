@@ -24,7 +24,8 @@ public final class OrvenBw implements ClientModInitializer {
         config.preload();
         debugLog = new io.github.liwwyy.orvenbw.debug.ClickDebugLog(
                 net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("orven-bw/click-debug.jsonl"),
-                () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error));
+                () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error),
+                net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("orven-bw").orElseThrow().getMetadata().getVersion().getFriendlyString());
         Runtime.getRuntime().addShutdownHook(new Thread(debugLog::close, "orven-bw-debug-shutdown"));
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);
@@ -38,8 +39,8 @@ public final class OrvenBw implements ClientModInitializer {
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.toggleModBind);
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdLeftBind);
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.holdRightBind);
-        HudManager.register(new ClickAssistHud(), "orven-bw.json", "combat");
-        LOGGER.info("orven-bw initialized (maintainer: liwwyy, Feather Gen 2 build 2)");
+        HudManager.register(new ClickAssistHud(), OrvenConfig.CONFIG_ID, "combat");
+        LOGGER.info("orven-bw Click Recording initialized (logging default on; optional features default off)");
     }
 
     public io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog() { return debugLog; }

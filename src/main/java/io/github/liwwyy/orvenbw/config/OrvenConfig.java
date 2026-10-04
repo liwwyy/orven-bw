@@ -11,6 +11,7 @@ import io.github.liwwyy.orvenbw.feature.clickassist.ClickSession;
 
 /** A native two-page layout with shared timing and hidden persisted-field aliases. */
 public final class OrvenConfig extends Config {
+    public static final String CONFIG_ID = "orven-bw-recording.json";
     @Include public boolean modEnabled = false;
     @Include public OneConfigKeybind settingsBind = KeybindHelper.builder().key(InputConstants.KEY_P).action((java.util.function.Consumer<Boolean>) down -> { if (down) openSettings(); }).build();
     @Include public boolean scoreboardOnly = false;
@@ -85,7 +86,7 @@ public final class OrvenConfig extends Config {
     @Include public boolean holdEnabled = false;
     @Include public OneConfigKeybind holdLeftBind = KeybindHelper.builder().action((java.util.function.Consumer<Boolean>) down -> input(1, down)).build();
     @Include public OneConfigKeybind holdRightBind = KeybindHelper.builder().action((java.util.function.Consumer<Boolean>) down -> input(2, down)).build();
-    @Include public boolean showHud = true;
+    @Include public boolean showHud = false;
     @Include public int configSchema = 0;
     @Include public int totalCpsCap = 13;
     @Include public int leftChance = 80;
@@ -120,7 +121,7 @@ public final class OrvenConfig extends Config {
 
     @Include public boolean heldCrouchCancel = true;
     @Include public boolean rockyRamp = true;
-    @Include public boolean debugEnabled = false;
+    @Include public boolean debugEnabled = true;
     @ItemList(title = "Allowed items", description = "Items that enable left physical boosting. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
     public String[] assistItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
     @ItemList(title = "Allowed items", description = "Items that enable left spam-key clicking. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
@@ -140,7 +141,7 @@ public final class OrvenConfig extends Config {
     @Info(title = "Advanced", description = "Shared CPS and timing for physical boosts, activation-key spam and mouse-hold clicks. Weapon filters remain feature-specific.", category = "ClickAssist", subcategory = "Advanced")
     public String advancedInfo = "";
     @Button(title = "ClickAssist", text = "Open ClickAssist", icon = "assets/orvenbw/icons/clickassist.svg", description = "Open physical CPS boost, spam click button, mouse button hold click, hit effects and shared timing settings.")
-    public void openClickAssist() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "ClickAssist")); }
+    public void openClickAssist() { OneConfigUI.open(new ModConfigRoute(CONFIG_ID, "ClickAssist")); }
     @Button(title = "Customize CPS HUD", text = "Open HUD editor", description = "Edit placement, colors, font, the CPS suffix and the dominant-side calculation.", category = "ClickAssist", subcategory = "HUD")
     public void editHud() { org.polyfrost.oneconfig.api.hud.v1.HudManager.INSTANCE.openEditor(); }
 
@@ -229,7 +230,7 @@ public final class OrvenConfig extends Config {
         option(collected, "debugEnabled", "Debug mode", "Append every observed user click and generated queue click to config/orven-bw/click-debug.jsonl, including millisecond timestamps and the generating method. Existing data is retained across restarts.", Visualizer.SwitchVisualizer.class);
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
-        Tree root = Tree.tree("orven-bw.json");
+        Tree root = Tree.tree(CONFIG_ID);
         leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "globalKeysInfo");
         section(root, collected, "globalKeys", "Keybinds", "General", "General", null, "settingsBind", "toggleModBind");
         leaves(root, collected, "General", "General", "conditionsInfo", "scoreboardOnly", "scoreboardWord");
@@ -384,7 +385,7 @@ public final class OrvenConfig extends Config {
                 randomizeTiming, levelVariation, timingVariation, levelMinMs, levelMaxMs, rockyRamp);
     }
     public ClickSession.Options rateOptions(boolean ignored) { return rateOptions(); }
-    public static void openSettings() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "General")); }
+    public static void openSettings() { OneConfigUI.open(new ModConfigRoute(CONFIG_ID, "General")); }
     public void toggleMod() {
         getProperty("modEnabled").setAs(!modEnabled);
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
@@ -395,5 +396,5 @@ public final class OrvenConfig extends Config {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
         if (mod != null) mod.clickAssist().activation(action, down);
     }
-    public OrvenConfig() { super("orven-bw.json", "orven-bw", Category.UTILITY); }
+    public OrvenConfig() { super(CONFIG_ID, "orven-bw — Click Recording", Category.UTILITY); }
 }

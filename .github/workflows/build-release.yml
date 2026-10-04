@@ -2,8 +2,8 @@ name: Build and release
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: [debug/click-recording]
+    tags: ['v*-recording']
   pull_request:
   workflow_dispatch:
 
@@ -42,7 +42,7 @@ jobs:
           version, mc = props['mod_version'], props['minecraft_version']
           if not re.fullmatch(r'\d+\.\d+\.\d+', version):
               raise SystemExit('mod_version must be x.x.x')
-          tag = f'v{version}'
+          tag = f'v{version}-recording'
           if os.environ['REF_TYPE'] == 'tag' and os.environ['REF_NAME'] != tag:
               raise SystemExit(f'Tag must match gradle.properties: {tag}')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
@@ -63,6 +63,7 @@ jobs:
           test -f "build/libs/$JAR"
           mkdir -p release
           cp "build/libs/$JAR" release/
+          cp docs/INSTALL_RECORDING.md release/
           cd release
           sha256sum "$JAR" > "$JAR.sha256"
       - uses: actions/upload-artifact@v7.0.1
@@ -74,7 +75,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/debug/click-recording' || endsWith(github.ref, '-recording'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -98,4 +99,4 @@ jobs:
             exit 0
           fi
           gh release create "$TAG" "release/$JAR" "release/$JAR.sha256" \
-            --target "$COMMIT" --title "orven-bw Ornithe $VERSION" --generate-notes
+            --target "$COMMIT" --title "orven-bw Click Recording $VERSION" --prerelease --latest=false --notes-file release/INSTALL_RECORDING.md

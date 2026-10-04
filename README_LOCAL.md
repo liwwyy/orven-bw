@@ -1,3 +1,28 @@
+# Recording branch notes
+
+This branch publishes **orven-bw Click Recording**, with logging on and all utilities
+and the HUD off for a fresh recording profile. Optional choices persist; logging is
+independent of the main switch. The regular main branch retains its normal defaults.
+
+See [friend installation instructions](docs/INSTALL_RECORDING.md). The recording config
+is `orven-bw-recording.json`, the HUD config is `orven-bw-recording-hud.json`, and the
+shared debug file remains `config/orven-bw/click-debug.jsonl`. Page shortcuts and HUD
+registration all use the recording configuration ID.
+
+Build with `JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build`. The jar is
+`orven-bw-Ornithe-0.2.1+mc1.8.9.jar`; the branch workflow publishes prerelease
+`v0.2.1-recording` without replacing the normal latest release. Future recording
+releases bump `mod_version` and use `v{mod_version}-recording` tags.
+
+Native event timestamps are preserved as both the legacy numeric field and exact
+`native_event_ns_text`. Session headers identify `build_flavor=recording` and mod version.
+The viewer's derived native clock subtracts integers before converting to milliseconds,
+anchors each session/clock segment independently, and does not join intervals across
+missing timestamps or clock resets. Native mode plots physical mouse input only;
+observation mode retains all methods. Legacy logs remain readable.
+
+---
+
 # orven-bw
 
 **Bedwars/PvP utils to lower your cortisol!** Maintained by **liwwyy**.
@@ -5,7 +30,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.2.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.2.1+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -115,7 +140,7 @@ not included in this mod's generated-click counter.
 ## Click debugging and charts
 
 Enable **ClickAssist → Advanced → Debugging → Debug mode** to append to one file:
-`config/orven-bw/click-debug.jsonl`. Debugging is off by default and can record physical
+`config/orven-bw/click-debug.jsonl`. Debugging is on by default in this recording build and can record physical
 mouse input while the main mod is disabled, including clicks in game menus. Each restart
 appends a new session ID to the same file. **Clear debug cache** empties that file in
 order with pending writes; recording can then continue in it.
@@ -177,13 +202,13 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current version is **0.2.0**. The
+release (patch for fixes, minor for features). The recording version is **0.2.1**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
-GitHub Actions builds and tests pushes to `main`, version tags, pull requests and manual
-runs. Successful main/tag builds publish a release named `v{mod_version}` with the
-runtime jar and its SHA-256 checksum. An existing release is retained; bump `mod_version`
+This branch’s GitHub Actions builds and tests pushes to `debug/click-recording`,
+recording version tags, pull requests and manual runs. Successful branch/tag builds
+publish prerelease `v{mod_version}-recording` with the runtime jar and SHA-256 checksum. An existing release is retained; bump `mod_version`
 to publish the next one. Explicit version tags must match `gradle.properties`. Pull
 requests build artifacts without publishing. Actions use JDK 27 and target Java 25.
 

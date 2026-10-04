@@ -62,18 +62,19 @@ class ConfigLayoutTest {
         assertEquals("Advanced", tree.get("spamWeapons").getMetadata("subcategory"));
         assertEquals("Advanced", tree.get("heldWeapons").getMetadata("subcategory"));
     }
-    @Test void sharedProfileAndAliasesReflectLiveFieldValuesAndDependencies() {
+    @Test void profilesAreLiveAndLegacyTimingIsHidden() {
         var config = new OrvenConfig(); Tree tree = tree(config);
-        tree.getProp("rates", "mediumCps").setAs(11.7);
-        assertEquals(11.7, config.rateOptions(false).medium());
-        assertEquals(config.rateOptions(false), config.rateOptions(true));
-        tree.getProp("mediumCps").setAs(10.2);
-        assertEquals(10.2, (double) tree.getProp("rates", "mediumCps").getAs());
-        assertEquals(true, tree.get("assistMediumCps").getMetadata("hidden"));
-        tree.getProp("ramp", "rampEnabled").setAs(false);
-        assertEquals(Property.Display.HIDDEN, tree.getProp("ramp", "rampMs").getDisplay());
-        tree.getProp("ramp", "rampEnabled").setAs(true);
-        assertEquals(Property.Display.SHOWN, tree.getProp("ramp", "rampMs").getDisplay());
+        assertEquals(0, config.clickingProfile); assertTrue(config.separateClickSides);
+        assertEquals(22, config.profileCpsCeiling);
+        assertArrayEquals(new String[]{"Humble", "Performative"}, (String[]) tree.get("behavior", "clickingProfile").getMetadata("options"));
+        assertEquals(Visualizer.RadioVisualizer.class, tree.get("behavior", "clickingProfile").getMetadata("visualizer"));
+        tree.getProp("behavior", "clickingProfile").setAs(1);
+        tree.getProp("behavior", "separateClickSides").setAs(false);
+        tree.getProp("behavior", "profileCpsCeiling").setAs(12.5);
+        assertEquals("Performative", config.profileOptions().name());
+        assertFalse(config.profileOptions().separateSides()); assertEquals(12.5, config.profileOptions().ceiling());
+        for (String field : new String[]{"highCps", "mediumCps", "randomizeTiming", "rockyRamp", "rampMs", "exhaustionEnabled"})
+            assertEquals(true, tree.get(field).getMetadata("hidden"), field);
         assertEquals(Property.Display.HIDDEN, tree.getProp("scoreboardWord").getDisplay());
         tree.getProp("scoreboardOnly").setAs(true);
         assertEquals(Property.Display.SHOWN, tree.getProp("scoreboardWord").getDisplay());
@@ -108,7 +109,7 @@ class ConfigLayoutTest {
         }
         assertTrue(java.util.Arrays.asList(config.heldItems).contains("minecraft:beef"));
         assertNotNull(tree.get("heldFilters", "heldCrouchCancel")); assertTrue(config.heldCrouchCancel);
-        assertNotNull(tree.get("ramp", "rockyRamp")); assertTrue(config.rockyRamp);
+        assertEquals(true, tree.get("rockyRamp").getMetadata("hidden"));
         String lastAdvanced = null;
         for (Node node : tree.map.values()) if ("Advanced".equals(node.getMetadata("subcategory"))) lastAdvanced=node.getID();
         assertEquals("debug", lastAdvanced); assertFalse(config.debugEnabled);

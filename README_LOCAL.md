@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.2.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.3.0+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -40,7 +40,7 @@ ClickAssist is arranged in this order:
 - **Hit effects:** floating observed-hit count and damage below target health, without
   a heart icon. Normal hits are green, combos of three orange, combos of five purple,
   and critical hits gold. Customize combo reset, animation duration and vertical offset.
-- **Advanced:** shared CPS levels, click timing, variation, ramp and exhaustion, plus
+- **Advanced:** shared fitted clicking behavior and the first-boost delay, plus
   native editable item lists for each clicking mode, then Debugging at the bottom.
   Groups start collapsed.
 - **HUD:** visibility and shortcut to OneConfig's HUD editor.
@@ -60,36 +60,61 @@ server tab list. It compares profile usernames ignoring case, not decorated disp
 names. Missing network/tab information fails the check. NPCs placed in the tab list can
 still qualify under this deliberately narrow rule.
 
-## Shared CPS profile
+## Sample-fitted clicking profiles (0.3.0)
 
-| Level | Default CPS | Approximate steady-session share |
-| --- | ---: | ---: |
-| High | 14.0 | 20% |
-| Medium | 12.5 | 40% |
-| Low | 9.5 | 40% |
+ClickAssist → Advanced → **Clicking behavior** replaces the old three-level bag,
+independent jitter, fixed ramp and periodic exhaustion controls. Existing saved values
+remain hidden compatibility keys; activation conditions and enabled states are preserved.
 
-Each side has its own active session using the same Advanced settings. A one-second
-ramp approaches the high level. **Rocky gradual ramp** is enabled by default: randomized
-bursts and short plateaus start around 3.1–4.6 CPS, reach 6.3–9.7 CPS, then approach
-the configured high level. Each session draws fresh knots. Physical boosting respects
-the manual-rate floor, and low configured targets clamp these example ranges. Disable
-Rocky gradual ramp to use the existing linear rise. A shuffled five-slot bag selects one high, two medium
-and two low levels. With variation enabled, level values vary within ±6%, dwell times
-range from 650–1400 ms, and transitions blend smoothly. Slow rate variation and bounded
-triangular interval variation avoid repeated identical patterns. Exhaustion is applied
-last to the varied rate: by default, after eight seconds, check every four seconds with
-30% chance to target 8–9 CPS for 600 ms. All values are configurable.
+- **Humble** (default): fitted tempo states, variable startup shapes, bursts, dips, and
+  correlated short/long interval categories. It learns from Wren’s fastest 60% of whole
+  sustained bouts, keeping the slower portions inside those bouts. Rare 21–22 left-CPS
+  target excursions are extrapolated: the recorded sample itself peaks at 20 left CPS.
+- **Performative**: preserves interval-category rhythm but compresses tempo excursions
+  toward the measured median (14 left / 6 right) by a factor of 0.35.
+- **Separate left/right behavior** (default on): use distinct fitted button models.
+  Turning it off uses independent left-model instances for both buttons, with right
+  target CPS reduced by 10% after the shared target ceiling is applied.
+- **Target CPS ceiling**: decimal slider, default 22, range 1–22. Physical input is
+  never suppressed. Generated rolling totals are bounded by the ceiling rounded up,
+  so a fractional target can alternate integer counts across one-second windows.
 
-Physical assistance supplies the difference between manual rate and the target. Manual
-clicks are preserved. Rates are targets; Minecraft's 20 Hz input processing limits
-spacing precision. Stalls drop pending generated work rather than replaying clicks.
-These are bounded timing variations, not a guarantee of human behavior or server acceptance.
+A bout requires ≥10 presses over ≥2 seconds, split at native clock resets or gaps
+>750 ms. Rank by `(presses − 1) / duration`, retaining `ceil(60% × eligible bouts)`.
+The fitted model retains 27 left bouts (1,291 presses, 91.9 active seconds) and 30 right
+bouts (963 presses, 121.4 active seconds). liwwyy is a cross-check only, not blended in.
+Startup types are building, steady and fast-then-settling; a universal low-to-high ramp
+is not imposed. Short samples cannot establish long-session fatigue.
 
-Schema 4 migrates the previously active spam profile if physical assistance was disabled;
-otherwise it selects the physical profile. Old independent values remain stored as hidden
-compatibility keys. The old activation bind moves to the matching new left/right bind.
-Migration runs once and preserves weapon filters and existing global state. Schema 5
-adds the editable item lists while retaining the shared CPS profile.
+Tempo state residence times, transitions, interval-category transitions and quantile
+curves are bundled as aggregates in `assets/orvenbw/click-profile-model.json`.
+Runtime sampling generates new intervals rather than replaying recorded sequences.
+No raw logs, session IDs or event timestamps are packaged in the jar.
+
+The scheduler queues up to two genuinely due clicks per button per tick through vanilla
+`KeyBinding.click`. It drops excess debt and work after stalls exceeding 250 ms.
+Physical boosting supplies only the shortfall below the modeled total rate. Button hold
+keeps its existing vanilla held-state behavior. Minecraft still processes input on ticks;
+modeled deadlines, actual queues, packets and registered hits are different measurements.
+
+Reproduce the fit from local samples (Python standard library only):
+
+```sh
+python3 scripts/fit_click_profiles.py \
+  --samples-directory /home/user/Projects/orven-bw/click_logs \
+  --output .reference/click-profile-report.json \
+  --model-output src/main/resources/assets/orvenbw/click-profile-model.json
+python3 -m unittest discover -s scripts -p 'test*.py'
+```
+
+The report includes exact sample hashes, selection summaries, liwwyy cross-checks,
+five-fold validation split by whole bouts, and intended-versus-queued scheduler
+simulations. The initial held-out CPS percentile error is ≤1 CPS, interval-category
+share error ≤3.89 percentage points, and adjacent-interval correlation error ≤0.115.
+Startup type shares also fall within the small sample’s 95% Wilson intervals.
+These checks measure agreement with the two samples, not server acceptance.
+Keep samples and reports local. The fit command rewrites the aggregate model only when
+`--model-output` is provided; omit it for read-only fitting and report generation.
 
 ## CPS HUD
 
@@ -177,7 +202,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current version is **0.2.0**. The
+release (patch for fixes, minor for features). The current standard version is **0.3.0**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
@@ -191,3 +216,21 @@ Reference sources, including Raven-bS and the supplied hit-show fragment, are un
 ignored `.reference/`. Original icons are under ignored `icons/`; the ClickAssist SVG is
 copied into tracked mod resources so builds remain reproducible.
 See [validation notes](docs/validation.md) and [source research](docs/research.md).
+
+## Profile deadline logging
+
+Each profile-generated queue row includes `profile`, `intended_ns_text`,
+`intended_elapsed_ns_text`, `queued_ns_text` and `dispatch_lateness_ns_text`.
+These are lossless decimal nanosecond strings. They supplement the existing actual
+observation timestamps; they never masquerade as `native_event_ns` mouse input.
+The viewer offers **Native mouse timing**, **Modeled deadlines (generated only)**,
+and **Minecraft observation timing**. Old logs without deadlines remain readable.
+
+The local viewer defaults to `click_logs`, discovering named subfolders, so `/liwwyy`
+and `/wren` retain independent caches. Start with `python3 scripts/click_debug_viewer.py`;
+use `--log` or `--directory` to inspect other data. Queue observations measure mod
+submissions, not confirmed server hits.
+
+Named sample pages default to All sessions so their charts cover the complete sample, matching the offline fit. Single-log viewing still defaults to the newest session.
+
+Startup baselines are fitted separately for building, steady and settling starts. The first-quarter fit subtracts the initial press already emitted at activation, avoiding an artificial extra-click bias in the ramp.

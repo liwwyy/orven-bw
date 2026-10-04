@@ -21,8 +21,56 @@ class LogCache:
 
     def reset(self):
         self.rows = deque(maxlen=self.limit)
+        self.sessions = {}
+        self.clocks = {}
         self.identity, self.prefix, self.position = None, b'', 0
         self.seen = self.malformed = 0
+
+    def annotate(self, row):
+        if row.get('source') == 'artificial' and row.get('action') == 'queue':
+            try:
+                elapsed = int(row['intended_elapsed_ns_text']) / 1e6
+                lateness = int(row['dispatch_lateness_ns_text']) / 1e6
+                if not math.isfinite(elapsed) or not math.isfinite(lateness) or lateness < 0:
+                    raise ValueError('Invalid intended timestamp')
+                row['_intended_elapsed_ms'] = elapsed
+                row['_intended_epoch_ms'] = row['timestamp_ms'] - lateness
+                row['_dispatch_lateness_ms'] = lateness
+            except (ValueError, TypeError, KeyError, OverflowError):
+                pass
+        # Native clocks have no absolute origin. Anchor differences within one session.
+        if row.get('source') != 'physical' or row.get('method') != 'mouse':
+            return row
+        session = row['session']
+        state = self.clocks.setdefault(session, dict(segment=0, anchor=None, last=None))
+        try:
+            raw = row.get('native_event_ns_text', row.get('native_event_ns'))
+            if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+                raise ValueError('No native timestamp')
+            native = int(raw)
+            if native < 0:
+                raise ValueError('Negative native timestamp')
+        except (ValueError, TypeError):
+            state['segment'] += 1
+            state['anchor'] = state['last'] = None
+            row['_timing_fallback'] = True
+            row['_native_segment'] = f"fallback-{state['segment']}"
+            return row
+        if state['last'] is not None and native < state['last']:
+            state['segment'] += 1
+            state['anchor'] = None
+        if state['anchor'] is None:
+            observed = row.get('elapsed_ns', 0)
+            elapsed = observed / 1e6 if isinstance(observed, (int, float)) and math.isfinite(observed) else 0
+            state['anchor'] = (native, elapsed, row['timestamp_ms'])
+        base, elapsed, epoch = state['anchor']
+        delta = (native - base) / 1e6  # Subtract Python integers before converting to milliseconds.
+        row['_native_elapsed_ms'] = elapsed + delta
+        row['_native_epoch_ms'] = epoch + delta
+        row['_native_segment'] = state['segment']
+        row['_timing_fallback'] = False
+        state['last'] = native
+        return row
 
     def locate(self):
         if self.explicit:
@@ -57,10 +105,12 @@ class LogCache:
                             row = json.loads(raw)
                             if not isinstance(row, dict):
                                 raise ValueError('Expected an object')
+                            if row.get('event') == 'session_start' and isinstance(row.get('session'), str):
+                                self.sessions[row['session']] = row
                             if row.get('event') == 'input':
                                 if not isinstance(row.get('timestamp_ms'), (int, float)) or not math.isfinite(row['timestamp_ms']) or not isinstance(row.get('session'), str):
                                     raise ValueError('Missing timestamp/session')
-                                self.rows.append(row)
+                                self.rows.append(self.annotate(row))
                                 self.seen += 1
                         except (ValueError, UnicodeDecodeError):
                             self.malformed += 1
@@ -70,7 +120,7 @@ class LogCache:
             except OSError as exception:
                 error = str(exception)
             return dict(events=list(self.rows), path=str(path), seen=self.seen,
-                        retained=len(self.rows), malformed=self.malformed, error=error)
+                        retained=len(self.rows), malformed=self.malformed, error=error, sessions=self.sessions.copy())
 
 
 def handler_for(cache, samples=None):

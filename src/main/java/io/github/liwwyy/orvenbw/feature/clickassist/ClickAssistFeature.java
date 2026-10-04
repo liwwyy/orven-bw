@@ -14,11 +14,11 @@ import org.lwjgl.input.Keyboard;
 
 public final class ClickAssistFeature implements ClientFeature {
     private final OrvenConfig config;
-    private final ClickAssistEngine engine = new ClickAssistEngine(() -> ThreadLocalRandom.current().nextDouble());
+    private final ClickAssistEngine engine = new ClickAssistEngine();
     private int attackCode = Integer.MIN_VALUE;
     private int useCode = Integer.MIN_VALUE;
 
-    private final ClickSession[] sessions = {new ClickSession(() -> ThreadLocalRandom.current().nextDouble()), new ClickSession(() -> ThreadLocalRandom.current().nextDouble())};
+    private final ClickProfileSession[] sessions = {new ClickProfileSession(() -> ThreadLocalRandom.current().nextDouble(), 0), new ClickProfileSession(() -> ThreadLocalRandom.current().nextDouble(), 1)};
     private final HeldClickTrigger[] heldTriggers = {new HeldClickTrigger(), new HeldClickTrigger()};
     private final boolean[] held = new boolean[2];
     private final boolean[] ownsHold = new boolean[2];
@@ -28,7 +28,7 @@ public final class ClickAssistFeature implements ClientFeature {
     private Minecraft client;
     private String bindSignature;
     private final int[] sources = {-1, -1};
-    private final ClickSession.Options[] profiles = new ClickSession.Options[2];
+    private final ClickProfileSession.Options[] profiles = new ClickProfileSession.Options[2];
 
     public void activation(int action, boolean down) {
         Minecraft mc = Minecraft.getInstance();
@@ -102,22 +102,24 @@ public final class ClickAssistFeature implements ClientFeature {
                     config.enabled && engine.manuallyActive(button, now, config.activationCps));
             boolean spamming = source == 1 || source == 2;
             boolean clicking = source >= 0 && (source == 2 ? heldPermitted : eligible(mc, button, spamming));
-            var profile = config.rateOptions();
+            var profile = config.profileOptions();
             if (sources[button] != source || !profile.equals(profiles[button])) {
                 sessions[button].reset(); engine.cancel(button);
                 sources[button] = source; profiles[button] = profile;
             }
             double base = engine.manualRate(button, now);
-            double target = sessions[button].target(now, clicking, spamming ? (config.rockyRamp ? 1 : 5) : base + 1, profile);
+            double target = sessions[button].target(now, clicking, profile);
             double generated = Math.max(0, target - base);
-            boolean clicked = engine.poll(button, now, generated, clicking,
-                    config.randomizeTiming,
-                    spamming ? 0 : config.boostDelayMs * 1_000_000L, config.timingVariation / 100.0);
-            if (clicked) {
-                KeyBinding.click(code);
-                debug(source == 1 ? "spam_click" : source == 2 ? "mouse_hold_click" : "cps_boost", button, "queue", code);
-                activeButton = button;
-            }
+            final int side = button, clickSource = source;
+            engine.pollDue(button, now, generated, clicking, spamming ? 0 : config.boostDelayMs * 1_000_000L,
+                    profile.ceiling(), sessions[button]::intervalWeight, intended -> {
+                        KeyBinding.click(code);
+                        var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+                        if (mod != null) mod.debugLog().generated(
+                                clickSource == 1 ? "spam_click" : clickSource == 2 ? "mouse_hold_click" : "cps_boost",
+                                side == 0 ? "left" : "right", code, profile.name(), intended, System.nanoTime());
+                        activeButton = side;
+                    });
         }
     }
 

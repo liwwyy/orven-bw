@@ -35,6 +35,19 @@ class ClickDebugLogTest {
         assertTrue(rows.get(2).get("elapsed_ns").getAsLong() >= rows.get(1).get("elapsed_ns").getAsLong());
         assertTrue(errors.isEmpty());
     }
+    @Test void generatedDeadlinesAreLosslessAndSeparateFromNativeEvents() throws Exception {
+        Path path=temp.resolve("click-debug.jsonl");
+        long queued=System.nanoTime(),intended=queued-25_000_123;
+        try(var log=new ClickDebugLog(path,()->true,failure->{throw new AssertionError(failure);})) {
+            log.generated("spam_click","right",-99,"Humble",intended,queued);
+        }
+        var row=JsonParser.parseString(Files.readAllLines(path).get(1)).getAsJsonObject();
+        assertEquals("Humble",row.get("profile").getAsString());
+        assertEquals(Long.toString(intended),row.get("intended_ns_text").getAsString());
+        assertEquals(Long.toString(queued),row.get("queued_ns_text").getAsString());
+        assertEquals("25000123",row.get("dispatch_lateness_ns_text").getAsString());
+        assertFalse(row.has("native_event_ns")); assertFalse(row.has("native_event_ns_text"));
+    }
     @Test void clearIsOrderedWithPendingWritesAndUsesTheSameFile() throws Exception {
         Path path = temp.resolve("click-debug.jsonl");
         try (var log = new ClickDebugLog(path, () -> true, failure -> {})) {

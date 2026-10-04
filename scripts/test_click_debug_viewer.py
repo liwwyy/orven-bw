@@ -52,6 +52,60 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(1, self.cache.snapshot()['seen'])
         self.assertEqual('a_new_session', self.cache.snapshot()['events'][0]['session'])
 
+    def test_native_batched_events_keep_exact_deltas_and_recording_identity(self):
+        self.append(dict(event='session_start', session='one', build_flavor='recording', mod_version='0.2.1+mc1.8.9'))
+        base = 1_800_000_000_000_123_457
+        for delta in (0, 5_000_000, 22_000_000):
+            row = event(100)
+            row['native_event_ns_text'] = str(base + delta)
+            row['native_event_ns'] = base + delta
+            self.append(row)
+        result = self.cache.snapshot()
+        self.assertEqual('recording', result['sessions']['one']['build_flavor'])
+        self.assertEqual([100, 105, 122], [r['_native_elapsed_ms'] for r in result['events']])
+        self.assertEqual([100, 105, 122], [r['_native_epoch_ms'] for r in result['events']])
+        self.assertEqual(1, len({r['_native_segment'] for r in result['events']}))
+
+    def test_native_legacy_numbers_and_clock_resets_do_not_bridge_intervals(self):
+        for native in (100_000_000, 105_000_000, 2_000_000):
+            row = event(50)
+            row['native_event_ns'] = native
+            self.append(row)
+        rows = self.cache.snapshot()['events']
+        self.assertEqual([50, 55, 50], [r['_native_elapsed_ms'] for r in rows])
+        self.assertNotEqual(rows[1]['_native_segment'], rows[2]['_native_segment'])
+        self.append(event(60))
+        fallback = self.cache.snapshot()['events'][-1]
+        self.assertTrue(fallback['_timing_fallback'])
+        row = event(70); row['native_event_ns'] = 10_000_000; self.append(row)
+        fresh = self.cache.snapshot()['events'][-1]
+        self.assertEqual(70, fresh['_native_elapsed_ms'])
+        self.assertNotEqual(fallback['_native_segment'], fresh['_native_segment'])
+
+    def test_native_clock_state_survives_retention_and_resets_on_clear(self):
+        for i in range(6):
+            row = event(100); row['native_event_ns_text'] = str(1_000_000 + i * 1_000_000)
+            self.append(row)
+        result = self.cache.snapshot()
+        self.assertEqual([103,104,105], [r['_native_elapsed_ms'] for r in result['events']])
+        self.path.write_text('')
+        self.assertEqual({}, self.cache.snapshot()['sessions'])
+        row = event(1, 'two'); row['native_event_ns_text'] = '1000000'; self.append(row)
+        self.assertEqual(1, self.cache.snapshot()['events'][0]['_native_elapsed_ms'])
+
+    def test_intended_deadlines_are_exact_and_never_native_mouse_events(self):
+        row=event(100)
+        row.update(source='artificial', method='spam_click', action='queue',
+                   intended_elapsed_ns_text='75000123', dispatch_lateness_ns_text='25000000')
+        self.append(row)
+        result=self.cache.snapshot()['events'][0]
+        self.assertAlmostEqual(75.000123,result['_intended_elapsed_ms'])
+        self.assertEqual(25,result['_dispatch_lateness_ms'])
+        self.assertNotIn('_native_elapsed_ms',result)
+        row['dispatch_lateness_ns_text']='invalid'
+        self.append(row)
+        self.assertNotIn('_intended_elapsed_ms',self.cache.snapshot()['events'][-1])
+
     def test_http_page_script_and_api_are_self_contained(self):
         self.append(event(123))
         other = self.path.parent / 'other.jsonl'

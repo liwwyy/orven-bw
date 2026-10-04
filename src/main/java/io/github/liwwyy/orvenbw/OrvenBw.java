@@ -24,7 +24,8 @@ public final class OrvenBw implements ClientModInitializer {
         config.preload();
         debugLog = new io.github.liwwyy.orvenbw.debug.ClickDebugLog(
                 net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("orven-bw/click-debug.jsonl"),
-                () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error));
+                () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error),
+                net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("orven-bw").map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("unknown"));
         Runtime.getRuntime().addShutdownHook(new Thread(debugLog::close, "orven-bw-debug-shutdown"));
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);

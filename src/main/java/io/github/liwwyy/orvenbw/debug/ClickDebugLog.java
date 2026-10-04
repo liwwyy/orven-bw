@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 /** Timestamp on the input thread; serialize append/clear operations on one background writer. */
 public final class ClickDebugLog implements AutoCloseable {
     private final Path path;
+    private final String modVersion;
     private final BooleanSupplier enabled;
     private final Consumer<Throwable> report;
     private final String session = UUID.randomUUID().toString();
@@ -27,7 +28,10 @@ public final class ClickDebugLog implements AutoCloseable {
     private BufferedWriter writer;
     private boolean failed;
     public ClickDebugLog(Path path, BooleanSupplier enabled, Consumer<Throwable> report) {
-        this.path = path; this.enabled = enabled; this.report = report;
+        this(path, enabled, report, "unknown");
+    }
+    public ClickDebugLog(Path path, BooleanSupplier enabled, Consumer<Throwable> report, String modVersion) {
+        this.path = path; this.enabled = enabled; this.report = report; this.modVersion = modVersion;
     }
     public Path path() { return path; }
     public void event(String source, String method, String side, String action, int keyCode, long nativeEventNanos) {
@@ -36,7 +40,23 @@ public final class ClickDebugLog implements AutoCloseable {
         JsonObject row = stamp("input", millis, nanos);
         row.addProperty("source", source); row.addProperty("method", method);
         row.addProperty("side", side); row.addProperty("action", action); row.addProperty("key_code", keyCode);
-        if (nativeEventNanos >= 0) row.addProperty("native_event_ns", nativeEventNanos);
+        if (nativeEventNanos >= 0) {
+            row.addProperty("native_event_ns", nativeEventNanos);
+            row.addProperty("native_event_ns_text", Long.toString(nativeEventNanos));
+        }
+        submit(() -> append(row));
+    }
+    /** Intended model deadlines are distinct from actual queue times and native hardware timestamps. */
+    public void generated(String method, String side, int keyCode, String profile, long intended, long queued) {
+        if (!enabled.getAsBoolean() || closed.get()) return;
+        JsonObject row = stamp("input", System.currentTimeMillis(), queued);
+        row.addProperty("source", "artificial"); row.addProperty("method", method);
+        row.addProperty("side", side); row.addProperty("action", "queue"); row.addProperty("key_code", keyCode);
+        row.addProperty("profile", profile);
+        row.addProperty("intended_ns_text", Long.toString(intended));
+        row.addProperty("intended_elapsed_ns_text", Long.toString(intended - started));
+        row.addProperty("queued_ns_text", Long.toString(queued));
+        row.addProperty("dispatch_lateness_ns_text", Long.toString(Math.max(0, queued - intended)));
         submit(() -> append(row));
     }
     private JsonObject stamp(String event, long millis, long nanos) {
@@ -45,6 +65,10 @@ public final class ClickDebugLog implements AutoCloseable {
         row.addProperty("sequence", event.equals("input") ? sequence.incrementAndGet() : 0);
         row.addProperty("timestamp_ms", millis); row.addProperty("monotonic_ns", nanos);
         row.addProperty("elapsed_ns", nanos - started);
+        if (event.equals("session_start")) {
+            row.addProperty("build_flavor", "standard");
+            row.addProperty("mod_version", modVersion);
+        }
         return row;
     }
     private void append(JsonObject row) throws IOException {

@@ -7,7 +7,7 @@ import org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindHelper;
 import org.polyfrost.oneconfig.api.ui.v1.keybind.OneConfigKeybind;
 import org.polyfrost.oneconfig.internal.legacy.InputConstants;
 import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModConfigRoute;
-import io.github.liwwyy.orvenbw.feature.clickassist.ClickSession;
+import io.github.liwwyy.orvenbw.feature.clickassist.ClickProfileSession;
 
 /** A native two-page layout with shared timing and hidden persisted-field aliases. */
 public final class OrvenConfig extends Config {
@@ -104,6 +104,9 @@ public final class OrvenConfig extends Config {
     @Include public OneConfigKeybind toggleModBind = KeybindHelper.builder().action((java.util.function.Consumer<Boolean>) down -> { if (down) toggleMod(); }).build();
     @Include public OneConfigKeybind spamLeftBind = KeybindHelper.builder().mouse(InputConstants.MOUSE_BUTTON_MIDDLE).action((java.util.function.Consumer<Boolean>) down -> input(3, down)).build();
     @Include public OneConfigKeybind spamRightBind = KeybindHelper.builder().action((java.util.function.Consumer<Boolean>) down -> input(4, down)).build();
+    @Include public int clickingProfile = 0;
+    @Include public boolean separateClickSides = true;
+    @Include public double profileCpsCeiling = 22;
     @Include public double highCps = 14;
     @Include public double mediumCps = 12.5;
     @Include public double lowCps = 9.5;
@@ -183,37 +186,11 @@ public final class OrvenConfig extends Config {
         option(collected, "spamWeaponOnly", "Keybind spam: allowed items only", "Restrict left activation-keybind spam to items in the editable list below.", Visualizer.SwitchVisualizer.class);
         option(collected, "boostDelayMs", "Physical first-boost delay (ms)", "Wait this long before the first generated physical-assist click. Does not delay activation-keybind or mouse-hold spam.", Visualizer.SliderVisualizer.class);
         slider(collected, "boostDelayMs", 0.0f, 150.0f, 5.0f);
-        option(collected, "highCps", "High CPS · 20%", "Shared total-rate level, selected for approximately 20% of steady-session time. Manual clicks are preserved.", Visualizer.SliderVisualizer.class);
-        slider(collected, "highCps", 1.0f, 20.0f, 0.1f);
-        option(collected, "mediumCps", "Medium CPS · 40%", "Shared total-rate level, selected for approximately 40% of steady-session time. Manual clicks are preserved.", Visualizer.SliderVisualizer.class);
-        slider(collected, "mediumCps", 1.0f, 20.0f, 0.1f);
-        option(collected, "lowCps", "Low CPS · 40%", "Shared total-rate level, selected for approximately 40% of steady-session time. Manual clicks are preserved.", Visualizer.SliderVisualizer.class);
-        slider(collected, "lowCps", 1.0f, 20.0f, 0.1f);
-        option(collected, "randomizeTiming", "Vary click timing", "Vary level values, dwell times and click intervals. Disable for fixed levels and evenly paced intervals.", Visualizer.SwitchVisualizer.class);
-        option(collected, "levelVariation", "CPS level variation (%)", "Randomly offset each selected CPS level within this percentage; transitions remain smooth.", Visualizer.SliderVisualizer.class);
-        slider(collected, "levelVariation", 0.0f, 15.0f, 1.0f);
-        option(collected, "timingVariation", "Click interval variation (%)", "Vary the time between generated clicks around the selected rate. Larger values create wider spacing differences.", Visualizer.SliderVisualizer.class);
-        slider(collected, "timingVariation", 0.0f, 35.0f, 1.0f);
-        option(collected, "levelMinMs", "Minimum level duration (ms)", "Shortest randomized time spent at a CPS level before choosing the next level.", Visualizer.SliderVisualizer.class);
-        slider(collected, "levelMinMs", 300.0f, 3000.0f, 50.0f);
-        option(collected, "levelMaxMs", "Maximum level duration (ms)", "Longest randomized time spent at a CPS level. Reversed minimum/maximum values are handled automatically.", Visualizer.SliderVisualizer.class);
-        slider(collected, "levelMaxMs", 300.0f, 3000.0f, 50.0f);
-        option(collected, "rampEnabled", "Enable gradual ramp", "Increase gently from the starting rate to the high CPS level before steady-session variation begins.", Visualizer.SwitchVisualizer.class);
-        option(collected, "rampMs", "Ramp duration (ms)", "Reach the high-rate region within this time after clicking becomes eligible. Default: one second.", Visualizer.SliderVisualizer.class);
-        slider(collected, "rampMs", 100.0f, 5000.0f, 100.0f);
-        option(collected, "exhaustionEnabled", "Enable exhaustion", "Occasionally reduce CPS during long sessions after selecting and varying the normal rate.", Visualizer.SwitchVisualizer.class);
-        option(collected, "exhaustionAfterMs", "Exhaustion starts after (ms)", "Minimum continuous clicking time before exhaustion can occur.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustionAfterMs", 1000.0f, 60000.0f, 1000.0f);
-        option(collected, "exhaustionIntervalMs", "Exhaustion check interval (ms)", "Time between chance checks once the session is long enough.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustionIntervalMs", 1000.0f, 30000.0f, 1000.0f);
-        option(collected, "exhaustionChance", "Exhaustion chance (%)", "Probability of a slower period at each check. Zero disables occurrences; 100 makes each check trigger.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustionChance", 0.0f, 100.0f, 1.0f);
-        option(collected, "exhaustionDurationMs", "Exhaustion duration (ms)", "How long a slower period lasts before the normal profile resumes.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustionDurationMs", 100.0f, 3000.0f, 100.0f);
-        option(collected, "exhaustedMinCps", "Exhausted minimum CPS", "Lower bound of the randomly chosen slower CPS target.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustedMinCps", 1.0f, 20.0f, 0.1f);
-        option(collected, "exhaustedMaxCps", "Exhausted maximum CPS", "Upper bound of the slower CPS target. Exhaustion never raises the normal target.", Visualizer.SliderVisualizer.class);
-        slider(collected, "exhaustedMaxCps", 1.0f, 20.0f, 0.1f);
+        option(collected, "clickingProfile", "Clicking profile", "Humble follows the sampled bursts and dips. Performative narrows tempo swings around the sampled median. Both preserve paired-click rhythm.", Visualizer.RadioVisualizer.class);
+        collected.get("clickingProfile").addMetadata("options", new String[]{"Humble", "Performative"});
+        option(collected, "separateClickSides", "Separate left/right behavior", "Use Wren’s slower right-click rhythm. Turn off to use independent left-model rhythms for both buttons, with right CPS reduced by 10%.", Visualizer.SwitchVisualizer.class);
+        option(collected, "profileCpsCeiling", "Target CPS ceiling", "Highest generated total-rate target. Manual clicks are never suppressed. Humble can briefly target 21–22 left CPS; these rare peaks extend beyond the sample.", Visualizer.SliderVisualizer.class);
+        slider(collected, "profileCpsCeiling", 1.0f, 22.0f, 0.1f);
         option(collected, "holdEnabled", "Enable button hold", "Latch Minecraft’s attack or use binding down until its toggle key is pressed again. Suppresses generated clicks on that side.", Visualizer.SwitchVisualizer.class);
         option(collected, "holdLeftBind", "Toggle left hold", "Press once to hold the attack binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
         option(collected, "holdRightBind", "Toggle right hold", "Press once to hold the use binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
@@ -225,7 +202,6 @@ public final class OrvenConfig extends Config {
         option(collected, "hitEffectOffsetY", "Text vertical offset", "Distance below the crosshair for health and floating hit text, in scaled screen pixels.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitEffectOffsetY", 0.0f, 100.0f, 1.0f);
         option(collected, "heldCrouchCancel", "Crouch cancel", "Cancel mouse-hold clicking while your sneak binding is held or your player is crouching. Release crouch to restart its activation timer.", Visualizer.SwitchVisualizer.class);
-        option(collected, "rockyRamp", "Rocky gradual ramp", "Rise in randomized bursts with short plateaus, rather than a straight line. Typical starts are 3.1–4.6 CPS, then 6.3–9.7 CPS before approaching the selected high level.", Visualizer.SwitchVisualizer.class);
         option(collected, "debugEnabled", "Debug mode", "Append every observed user click and generated queue click to config/orven-bw/click-debug.jsonl, including millisecond timestamps and the generating method. Existing data is retained across restarts.", Visualizer.SwitchVisualizer.class);
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
@@ -247,12 +223,8 @@ public final class OrvenConfig extends Config {
         section(root, collected, "hitOptions", "Animation", "ClickAssist", "Hit effects", null,
                 "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY");
         leaves(root, collected, "ClickAssist", "Advanced", "advancedInfo");
-        section(root, collected, "rates", "CPS levels", "ClickAssist", "Advanced", null, "highCps", "mediumCps", "lowCps");
-        section(root, collected, "timing", "Click timing", "ClickAssist", "Advanced", "randomizeTiming",
-                "levelVariation", "timingVariation", "levelMinMs", "levelMaxMs", "boostDelayMs");
-        section(root, collected, "ramp", "Gradual ramp", "ClickAssist", "Advanced", "rampEnabled", "rockyRamp", "rampMs");
-        section(root, collected, "exhaustion", "Exhaustion", "ClickAssist", "Advanced", "exhaustionEnabled",
-                "exhaustionAfterMs", "exhaustionIntervalMs", "exhaustionChance", "exhaustionDurationMs", "exhaustedMinCps", "exhaustedMaxCps");
+        section(root, collected, "behavior", "Clicking behavior", "ClickAssist", "Advanced", null,
+                "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs");
         section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems");
         section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems");
         section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems");
@@ -262,10 +234,6 @@ public final class OrvenConfig extends Config {
         depends(collected, "weaponOnly", "assistItems");
         depends(collected, "spamWeaponOnly", "spamItems");
         depends(collected, "heldClickWeaponOnly", "heldItems");
-        depends(collected, "rampEnabled", "rampMs", "rockyRamp");
-        depends(collected, "randomizeTiming", "levelVariation", "timingVariation", "levelMinMs", "levelMaxMs");
-        depends(collected, "exhaustionEnabled", "exhaustionAfterMs", "exhaustionIntervalMs", "exhaustionChance",
-                "exhaustionDurationMs", "exhaustedMinCps", "exhaustedMaxCps");
         // Flat field aliases retain settings saved by every earlier layout.
         for (var field : getClass().getFields()) {
             if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || root.map.containsKey(field.getName())) continue;
@@ -377,13 +345,9 @@ public final class OrvenConfig extends Config {
         }
         return items.toArray(String[]::new);
     }
-    public ClickSession.Options rateOptions() {
-        return new ClickSession.Options(highCps, mediumCps, lowCps, rampEnabled, rampMs,
-                exhaustionEnabled, exhaustionAfterMs, exhaustionIntervalMs, exhaustionChance,
-                exhaustionDurationMs, exhaustedMinCps, exhaustedMaxCps,
-                randomizeTiming, levelVariation, timingVariation, levelMinMs, levelMaxMs, rockyRamp);
+    public ClickProfileSession.Options profileOptions() {
+        return new ClickProfileSession.Options(clickingProfile, separateClickSides, profileCpsCeiling);
     }
-    public ClickSession.Options rateOptions(boolean ignored) { return rateOptions(); }
     public static void openSettings() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "General")); }
     public void toggleMod() {
         getProperty("modEnabled").setAs(!modEnabled);

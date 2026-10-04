@@ -3,20 +3,21 @@ package io.github.liwwyy.orvenbw.feature.clickassist;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.function.DoubleSupplier;
+import java.util.function.LongConsumer;
 
 /** Counts real input separately and dispatches fractional generated rates on the client thread. */
 public final class ClickAssistEngine {
     private static final long SECOND = 1_000_000_000L;
     private final Channel[] channels = {new Channel(), new Channel()};
-    private final DoubleSupplier random;
     private long lastClick = Long.MIN_VALUE;
-    public ClickAssistEngine(DoubleSupplier random) { this.random = random; }
+    public ClickAssistEngine() {}
     public record Cps(int base, int boosted) { public int total() { return base + boosted; } }
     private static final class Channel {
         final Deque<Long> physical = new ArrayDeque<>(), boosted = new ArrayDeque<>();
         long lastPhysical, previousPhysical, countingSince, lastPoll;
         boolean hasPhysical, hasPrevious, running;
-        double credit, threshold;
+        double rate;
+        long nextDue, notBefore;
     }
 
     public void physicalClick(int button, long now) {
@@ -44,7 +45,7 @@ public final class ClickAssistEngine {
         if (interval <= 0) return 0;
         long freshness = Math.clamp(interval * 2, 150_000_000L, 400_000_000L);
         if (now - c.lastPhysical > freshness) return 0;
-        if (now - c.countingSince < SECOND) return Math.min(20, SECOND / (double) interval);
+        if (now - c.countingSince < SECOND) return SECOND / (double) interval;
         return c.physical.size();
     }
     public boolean manuallyActive(int button, long now, int activation) {
@@ -53,39 +54,44 @@ public final class ClickAssistEngine {
         return manualRate(button, now) > activation;
     }
 
-    /** At most one click per tick; a stall discards accrued work. Same scheduler for hold/toggle spam. */
-    public boolean poll(int button, long now, double generatedRate, boolean eligible, boolean vary, long initialDelay) {
-        return poll(button, now, generatedRate, eligible, vary, initialDelay, 0.15);
-    }
-    public boolean poll(int button, long now, double generatedRate, boolean eligible, boolean vary, long initialDelay, double variation) {
+    /** Deadline scheduler: at most two due clicks per tick; stalls and excess debt are discarded. */
+    public int pollDue(int button, long now, double generatedRate, boolean eligible, long initialDelay,
+                       double ceiling, DoubleSupplier intervalWeight, LongConsumer dispatch) {
         Channel c = channel(button);
         prune(c, now);
         if (!eligible || !Double.isFinite(generatedRate) || generatedRate <= 0) {
-            cancel(button); return false;
+            cancel(button); return 0;
         }
-        double rate = Math.min(20, generatedRate);
+        double rate = Math.clamp(generatedRate, .01, 22);
         if (!c.running) {
-            c.running = true; c.lastPoll = now + Math.max(0, initialDelay);
-            c.threshold = intervalWeight(vary, variation); c.credit = c.threshold;
+            c.running = true; c.lastPoll = now; c.nextDue = now + Math.max(0, initialDelay); c.notBefore = c.nextDue; c.rate = rate;
+        } else {
+            long elapsed = now - c.lastPoll;
+            if (elapsed < 0 || elapsed > 250_000_000L) {
+                c.lastPoll = now; c.rate = rate; c.nextDue = now + interval(rate, intervalWeight); return 0;
+            }
+            if (now >= c.notBefore && rate != c.rate && c.nextDue > now)
+                c.nextDue = now + (long) ((c.nextDue - now) * c.rate / rate);
+            c.lastPoll = now; c.rate = rate;
         }
-        if (now < c.lastPoll) return false;
-        long elapsed = now - c.lastPoll;
-        c.lastPoll = now;
-        if (elapsed > 250_000_000L) {
-            c.credit = 0; c.threshold = intervalWeight(vary, variation); return false;
+        if (now < c.notBefore) return 0;
+        int count = 0;
+        int limit = (int) Math.ceil(Double.isFinite(ceiling) ? Math.clamp(ceiling, 1, 22) : 22);
+        while (now >= c.nextDue && count < 2) {
+            long intended = c.nextDue;
+            c.nextDue += interval(rate, intervalWeight);
+            // The generated total ceiling never suppresses physical input.
+            if (c.physical.size() + c.boosted.size() >= limit) break;
+            dispatch.accept(intended);
+            c.boosted.addLast(now); lastClick = now; count++;
         }
-        c.credit = Math.min(c.threshold + 1, c.credit + Math.min(elapsed, 50_000_000L) * rate / SECOND);
-        if (c.credit + 1e-9 < c.threshold) return false;
-        c.credit -= c.threshold;
-        c.threshold = intervalWeight(vary, variation);
-        c.boosted.addLast(now);
-        lastClick = now;
-        return true;
+        if (now >= c.nextDue) c.nextDue = now + interval(rate, intervalWeight);
+        return count;
     }
-    private double intervalWeight(boolean vary, double variation) {
-        double spread = Double.isFinite(variation) ? Math.clamp(variation, 0, 0.35) : 0;
-        // Symmetric triangular jitter avoids repeatedly hitting the extreme interval bounds.
-        return vary ? 1 + (random.getAsDouble() + random.getAsDouble() - 1) * spread : 1;
+    private static long interval(double rate, DoubleSupplier weight) {
+        double value = weight.getAsDouble();
+        if (!Double.isFinite(value) || value <= 0) value = 1;
+        return (long) Math.clamp(value * SECOND / rate, 8_000_000, 120_000_000_000L);
     }
     public int dominantButton(long now, int previous) {
         Cps left = cps(0, now), right = cps(1, now);
@@ -100,7 +106,7 @@ public final class ClickAssistEngine {
         for (long time : channel.boosted) if (now - time < 250_000_000L) count++;
         return count;
     }
-    public void cancel(int button) { Channel c = channel(button); c.running = false; c.credit = 0; }
+    public void cancel(int button) { Channel c = channel(button); c.running = false; c.nextDue = 0; }
     public Cps cps(int button, long now) {
         Channel c = channel(button); prune(c, now);
         return new Cps(c.physical.size(), c.boosted.size());
@@ -110,7 +116,7 @@ public final class ClickAssistEngine {
         lastClick = Long.MIN_VALUE;
         for (Channel c : channels) {
             c.physical.clear(); c.boosted.clear(); c.hasPhysical = c.hasPrevious = c.running = false;
-            c.credit = 0;
+            c.nextDue = 0;
         }
     }
     private Channel channel(int button) {

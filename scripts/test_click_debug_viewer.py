@@ -93,6 +93,19 @@ class ViewerTests(unittest.TestCase):
         row = event(1, 'two'); row['native_event_ns_text'] = '1000000'; self.append(row)
         self.assertEqual(1, self.cache.snapshot()['events'][0]['_native_elapsed_ms'])
 
+    def test_intended_deadlines_are_exact_and_never_native_mouse_events(self):
+        row=event(100)
+        row.update(source='artificial', method='spam_click', action='queue',
+                   intended_elapsed_ns_text='75000123', dispatch_lateness_ns_text='25000000')
+        self.append(row)
+        result=self.cache.snapshot()['events'][0]
+        self.assertAlmostEqual(75.000123,result['_intended_elapsed_ms'])
+        self.assertEqual(25,result['_dispatch_lateness_ms'])
+        self.assertNotIn('_native_elapsed_ms',result)
+        row['dispatch_lateness_ns_text']='invalid'
+        self.append(row)
+        self.assertNotIn('_intended_elapsed_ms',self.cache.snapshot()['events'][-1])
+
     def test_http_page_script_and_api_are_self_contained(self):
         self.append(event(123))
         other = self.path.parent / 'other.jsonl'

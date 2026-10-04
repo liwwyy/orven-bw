@@ -8,7 +8,7 @@ if (sampleName) {
 }
 const colors = {mouse:'#7dd3fc',keyboard_binding:'#38bdf8',cps_boost:'#c4a5ff',spam_click:'#fbad73',mouse_hold_click:'#89e3ac',button_hold:'#f0a8d9'};
 const names = {mouse:'Physical mouse',keyboard_binding:'Physical keyboard',cps_boost:'Physical CPS boost',spam_click:'Spam keybind',mouse_hold_click:'Mouse hold click',button_hold:'Button hold'};
-let data=[], selected='latest', view=null, bounds=[0,1], plots=new Map(), busy=false, follow=true;
+let data=[], selected=sampleName?'all':'latest', view=null, bounds=[0,1], plots=new Map(), busy=false, follow=true;
 let enabled=new Set(Object.keys(names)), sessionInfo={}, timingChosen=false;
 for(const [method,name] of Object.entries(names)){
  const label=document.createElement('label'), input=document.createElement('input'); input.type='checkbox';input.checked=true;
@@ -17,17 +17,19 @@ for(const [method,name] of Object.entries(names)){
 }
 function click(row){return row.action==='press'||row.action==='queue';}
 function nativeMode(){return $('timing').value==='native';}
+function plannedMode(){return $('timing').value==='planned';}
 function defaultTiming(){const ids=selected==='all'?[...new Set(data.map(r=>r.session))]:[selected];return ids.length&&ids.every(id=>sessionInfo[id]?.build_flavor==='recording')?'native':'observed';}
 function time(row){
+ if(plannedMode())return selected==='all'?row._intended_epoch_ms:row._intended_elapsed_ms;
  if(nativeMode()&&Number.isFinite(row._native_elapsed_ms))return selected==='all'?row._native_epoch_ms:row._native_elapsed_ms;
  return selected!=='all'&&Number.isFinite(row.elapsed_ns)?row.elapsed_ns/1e6:row.timestamp_ms;
 }
-function filtered(){return data.filter(r=>(selected==='all'||r.session===selected)&&enabled.has(r.method)&&(!nativeMode()||(r.source==='physical'&&r.method==='mouse'))&&($('side').value==='all'||($('side').value==='both'?['left','right'].includes(r.side):r.side===$('side').value))&&($('releases').checked||click(r))).sort((a,b)=>time(a)-time(b));}
+function filtered(){return data.filter(r=>(selected==='all'||r.session===selected)&&enabled.has(r.method)&&(!nativeMode()||(r.source==='physical'&&r.method==='mouse'))&&(!plannedMode()||(r.source==='artificial'&&Number.isFinite(r._intended_elapsed_ms)))&&($('side').value==='all'||($('side').value==='both'?['left','right'].includes(r.side):r.side===$('side').value))&&($('releases').checked||click(r))).sort((a,b)=>time(a)-time(b));}
 function intervals(rows){
  const previous=new Map(),result=[];
  for(const r of rows.filter(click)){
   const native=nativeMode(), key=r.session+':'+r.side+(native?':'+r._native_segment:''),t=time(r),last=previous.get(key);
-  if(last)result.push({x:t,y:native?t-time(last):Number.isFinite(r.elapsed_ns)&&Number.isFinite(last.elapsed_ns)?(r.elapsed_ns-last.elapsed_ns)/1e6:t-time(last),row:r});
+  if(last)result.push({x:t,y:native||plannedMode()?t-time(last):Number.isFinite(r.elapsed_ns)&&Number.isFinite(last.elapsed_ns)?(r.elapsed_ns-last.elapsed_ns)/1e6:t-time(last),row:r});
   previous.set(key,r);
  }
  return result;
@@ -46,7 +48,7 @@ function drawPoint(id,p,color,hollow=false){const plot=plots.get(id),ctx=$(id).g
 function render(){
  const all=filtered();
  const fallbacks=all.filter(r=>r._timing_fallback).length;
- $('timing-note').textContent=nativeMode()?'Native mouse-event differences; only physical mouse input is plotted. '+(fallbacks?fallbacks+' records use observation-time fallback (not joined across missing timestamps).':'Clock origins are anchored per session; resets start new interval segments.'):'Minecraft observation timing includes buffered-input processing delays. Native mouse timing is available separately.';
+ $('timing-note').textContent=plannedMode()?'Model deadlines only. These are not hardware events, actual queue times, server packets, or registered hits. Switch to observation timing to inspect dispatch.':nativeMode()?'Native mouse-event differences; only physical mouse input is plotted. '+(fallbacks?fallbacks+' records use observation-time fallback (not joined across missing timestamps).':'Clock origins are anchored per session; resets start new interval segments.'):'Minecraft observation timing includes buffered-input processing delays. Native mouse timing is available separately.';
  bounds=all.length?[time(all[0]),time(all[all.length-1])+1]:[0,1];if(!view)view=[...bounds];
  if(view[1]<=view[0])view[1]=view[0]+1;
  const shown=all.filter(r=>time(r)>=view[0]&&time(r)<=view[1]),clicks=shown.filter(click),ints=intervals(all).filter(p=>p.x>=view[0]&&p.x<=view[1]&&p.y>=0);
@@ -91,6 +93,6 @@ for(const id of ['timeline','cps','intervals']){
  const c=$(id);let drag=null;
  c.addEventListener('wheel',event=>{event.preventDefault();follow=false;const p=plots.get(id),ratio=Math.clamp?Math.clamp((event.offsetX-p.box.left)/(p.box.right-p.box.left),0,1):Math.max(0,Math.min(1,(event.offsetX-p.box.left)/(p.box.right-p.box.left)));const focus=view[0]+ratio*(view[1]-view[0]),span=Math.max(20,(view[1]-view[0])*Math.exp(event.deltaY*.001));view=[focus-ratio*span,focus+(1-ratio)*span];render();},{passive:false});
  c.onpointerdown=e=>{follow=false;drag={x:e.clientX,view:[...view]};c.setPointerCapture(e.pointerId);};c.onpointerup=()=>{drag=null;};c.onpointercancel=()=>{drag=null;};
- c.onpointermove=e=>{const p=plots.get(id);if(drag){const shift=(e.clientX-drag.x)/(p.box.right-p.box.left)*(drag.view[1]-drag.view[0]);view=drag.view.map(t=>t-shift);render();return;}const point=p.points.reduce((best,point)=>Math.hypot(point.px-e.offsetX,point.py-e.offsetY)<(best?Math.hypot(best.px-e.offsetX,best.py-e.offsetY):12)?point:best,null);const tip=$('tooltip');if(!point){tip.style.display='none';return;}const r=point.row;tip.textContent='Observed '+new Date(r.timestamp_ms).toISOString()+'\n'+r.source+' · '+r.method+' · '+r.side+' · '+r.action+(nativeMode()?(r._timing_fallback?' · observation fallback':' · native mouse timing'):' · observation timing')+'\nSequence '+r.sequence+' · '+(id==='intervals'?point.y.toFixed(3)+' ms interval':'relative time '+time(r).toFixed(3)+' ms');tip.style.display='block';tip.style.left=Math.min(e.clientX+12,window.innerWidth-350)+'px';tip.style.top=Math.max(0,e.clientY-90)+'px';};c.onpointerleave=()=>{$('tooltip').style.display='none';};
+ c.onpointermove=e=>{const p=plots.get(id);if(drag){const shift=(e.clientX-drag.x)/(p.box.right-p.box.left)*(drag.view[1]-drag.view[0]);view=drag.view.map(t=>t-shift);render();return;}const point=p.points.reduce((best,point)=>Math.hypot(point.px-e.offsetX,point.py-e.offsetY)<(best?Math.hypot(best.px-e.offsetX,best.py-e.offsetY):12)?point:best,null);const tip=$('tooltip');if(!point){tip.style.display='none';return;}const r=point.row;tip.textContent='Observed '+new Date(r.timestamp_ms).toISOString()+'\n'+r.source+' · '+r.method+' · '+r.side+' · '+r.action+(nativeMode()?(r._timing_fallback?' · observation fallback':' · native mouse timing'):(plannedMode()?' · intended deadline':' · observation timing'))+(r.profile?' · '+r.profile:'')+(Number.isFinite(r._dispatch_lateness_ms)?'\nDispatch lateness '+r._dispatch_lateness_ms.toFixed(3)+' ms':'')+'\nSequence '+r.sequence+' · '+(id==='intervals'?point.y.toFixed(3)+' ms interval':'relative time '+time(r).toFixed(3)+' ms');tip.style.display='block';tip.style.left=Math.min(e.clientX+12,window.innerWidth-350)+'px';tip.style.top=Math.max(0,e.clientY-90)+'px';};c.onpointerleave=()=>{$('tooltip').style.display='none';};
 }
 window.addEventListener('resize',render);refresh();setInterval(()=>{if($('live').checked)refresh();},1000);

@@ -46,6 +46,19 @@ public final class ClickDebugLog implements AutoCloseable {
         }
         submit(() -> append(row));
     }
+    /** Intended model deadlines are distinct from actual queue times and native hardware timestamps. */
+    public void generated(String method, String side, int keyCode, String profile, long intended, long queued) {
+        if (!enabled.getAsBoolean() || closed.get()) return;
+        JsonObject row = stamp("input", System.currentTimeMillis(), queued);
+        row.addProperty("source", "artificial"); row.addProperty("method", method);
+        row.addProperty("side", side); row.addProperty("action", "queue"); row.addProperty("key_code", keyCode);
+        row.addProperty("profile", profile);
+        row.addProperty("intended_ns_text", Long.toString(intended));
+        row.addProperty("intended_elapsed_ns_text", Long.toString(intended - started));
+        row.addProperty("queued_ns_text", Long.toString(queued));
+        row.addProperty("dispatch_lateness_ns_text", Long.toString(Math.max(0, queued - intended)));
+        submit(() -> append(row));
+    }
     private JsonObject stamp(String event, long millis, long nanos) {
         JsonObject row = new JsonObject();
         row.addProperty("schema", 1); row.addProperty("event", event); row.addProperty("session", session);

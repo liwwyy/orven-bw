@@ -27,6 +27,17 @@ class LogCache:
         self.seen = self.malformed = 0
 
     def annotate(self, row):
+        if row.get('source') == 'artificial' and row.get('action') == 'queue':
+            try:
+                elapsed = int(row['intended_elapsed_ns_text']) / 1e6
+                lateness = int(row['dispatch_lateness_ns_text']) / 1e6
+                if not math.isfinite(elapsed) or not math.isfinite(lateness) or lateness < 0:
+                    raise ValueError('Invalid intended timestamp')
+                row['_intended_elapsed_ms'] = elapsed
+                row['_intended_epoch_ms'] = row['timestamp_ms'] - lateness
+                row['_dispatch_lateness_ms'] = lateness
+            except (ValueError, TypeError, KeyError, OverflowError):
+                pass
         # Native clocks have no absolute origin. Anchor differences within one session.
         if row.get('source') != 'physical' or row.get('method') != 'mouse':
             return row

@@ -29,8 +29,7 @@ def version_key(path):
     return tuple((0, int(x)) if x.isdigit() else (1, x) for x in re.split(r"[.\-+]", path.name))
 
 
-run("python3", ROOT / "scripts/prepare-oneconfig.py")
-jars = list((ROOT / ".reference/oneconfig-beta").glob("*.jar"))
+jars = []  # The published SDK must already be in the Gradle cache.
 for artifact in (CACHE / "modules-2/files-2.1").glob("*/*"):
     versions = [p for p in artifact.iterdir() if p.is_dir()]
     if versions:
@@ -95,7 +94,7 @@ compile_sources([*(ROOT / "src/test/java").rglob("*.java"), runner, remap], test
 run(JDK / "bin/java", "-cp", os.pathsep.join([str(test_out), str(main_out), classpath]), "TestRunner")
 properties = dict(line.split("=", 1) for line in (ROOT / "gradle.properties").read_text().splitlines() if "=" in line and not line.startswith("#"))
 version = properties["mod_version"] + "+mc" + properties["minecraft_version"]
-name = "orven-bw-" + version
+name = "orven-bw-Ornithe-" + version
 dev = ROOT / "build/devlibs" / (name + "-dev.jar")
 jar = ROOT / "build/libs" / (name + ".jar")
 dev.parent.mkdir(parents=True, exist_ok=True)

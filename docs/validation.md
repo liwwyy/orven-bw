@@ -240,3 +240,24 @@ not server-confirmed attacks. Vanilla held-use repeats and other mods' input are
 this generated-event counter. The persistent log appends at config/orven-bw/click-debug.jsonl;
 Clear debug cache truncates the same file. The viewer defaults to the requested OneClient
 cluster config directory and never modifies its input file.
+
+## Public CI and versioned Ornithe releases (2026-10-04)
+
+The current public build no longer requires a local OneConfig beta jar or ignored
+.reference contents. A clean JDK 27 Gradle build resolves the published OneConfig
+1.2.18 SDK/platform from Maven and passes all **47 Java tests**. The **3 Python viewer
+tests**, JavaScript syntax check and actionlint workflow validation also pass.
+The declared OneConfig minimum is now 1.2.18; no mod feature logic changed for this
+SDK transition. Older beta extraction instructions above are historical.
+
+Version is now 0.2.0. The runtime artifact is
+`orven-bw-Ornithe-0.2.0+mc1.8.9.jar`, matching the mod metadata's `0.2.0+mc1.8.9`.
+It targets Java 25 (major 69), retains Gen 2/intermediary metadata, and bundles no
+OneConfig or other dependency jars. Local SHA256:
+`e0f29375dff1e6b03700211be8e881e4341e1a4f26294b8bb8386fd9c4fd952f`.
+
+GitHub Actions builds/tests main pushes, v-prefixed tags, PRs and manual runs. Main/tag
+builds publish a new version with the runtime jar and checksum after successful tests.
+Existing releases are retained, so bump mod_version for each new release. Tags must
+match the version property. Pull requests only produce build artifacts.
+README.md is empty; project/build notes are now in README_LOCAL.md.

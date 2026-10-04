@@ -198,3 +198,20 @@ also checks the currently bound physical sneak key, so it respects remapping.
 Real mouse events are observed at LWJGL `Mouse.next` return and retain native nanosecond
 and observation millisecond timestamps. Artificial clicks are recorded at the existing
 `KeyBinding.click` submission sites, with the active mode identified separately.
+
+## Public CI dependencies and releases
+
+Polyfrost's published Maven metadata now lists OneConfig 1.2.18 for the modular SDK
+and 1.8.9 Ornithe platform. The earlier 1.2.9 beta is absent from those published
+versions. Builds now resolve the 1.2.18 compile-only SDK from
+https://repo.polyfrost.org/releases/ instead of extracting jars from a local instance.
+The platform dependency is remapped by Loom; the config/HUD/UI/internal modules and
+their dependencies come from public Maven repositories, including Google's AndroidX
+repository for Compose dependencies. OneConfig is still supplied by OneClient at runtime
+and is not bundled in the mod jar. The declared minimum is now 1.2.18.
+
+DeepWiki was asked about category navigation; the SDK's internal module supplies
+ModConfigRoute. The existing General and ClickAssist page shortcuts are retained.
+GitHub action versions were checked against their official release APIs; actionlint
+validates the build/release workflow. Release version/name come from gradle.properties,
+with x.x.x validation and tag/version agreement enforced before compiling.

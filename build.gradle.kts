@@ -3,25 +3,18 @@ plugins {
     id("ploceus") version "1.18.1"
 }
 
-version = "${property("mod_version")}+mc${property("minecraft_version")}"
+val modVersion = property("mod_version").toString()
+require(modVersion.matches(Regex("\\d+\\.\\d+\\.\\d+"))) { "mod_version must use x.x.x" }
+version = "$modVersion+mc${property("minecraft_version")}"
 group = "io.github.liwwyy"
-base.archivesName = "orven-bw"
+base.archivesName = "orven-bw-Ornithe"
 
 ploceus { setIntermediaryGeneration(2) }
 
 repositories {
     mavenCentral()
+    google()
     maven("https://repo.polyfrost.org/releases")
-}
-
-val prepareOneConfig = tasks.register<Exec>("prepareOneConfig") {
-    val betaJar = providers.gradleProperty("oneconfigJar").orElse(
-        "/mnt/nvme/PrismLauncher/instances/OneClient Beta final/minecraft/mods/OneConfig-1.8.9-ornithe-${project.property("oneconfig_version")}.jar"
-    )
-    inputs.file(betaJar)
-    inputs.file("scripts/prepare-oneconfig.py")
-    outputs.dir(layout.projectDirectory.dir(".reference/oneconfig-beta"))
-    commandLine("python3", "scripts/prepare-oneconfig.py", betaJar.get())
 }
 
 dependencies {
@@ -29,11 +22,15 @@ dependencies {
     mappings(ploceus.featherMappings(property("feather_build").toString()))
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
 
-    // Beta 1.2.9 is not published on Maven. Compile against the exact installed APIs.
-    // OneClient supplies these at runtime; no OneConfig code is bundled in this mod.
-    compileOnly(files(fileTree(".reference/oneconfig-beta") { include("*.jar") }).builtBy(prepareOneConfig))
+    // Published SDK: reproducible on GitHub runners without local beta extraction.
+    val oneconfigVersion = property("oneconfig_version").toString()
+    for (module in listOf("config-impl", "hud", "ui", "utils", "events", "internal")) {
+        compileOnly("org.polyfrost.oneconfig:$module:$oneconfigVersion")
+        testImplementation("org.polyfrost.oneconfig:$module:$oneconfigVersion")
+    }
+    modCompileOnly("org.polyfrost.oneconfig:1.8.9-ornithe:$oneconfigVersion") { isTransitive = false }
+    testImplementation("org.polyfrost.oneconfig:1.8.9-ornithe:$oneconfigVersion") { isTransitive = false }
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.20")
-    testImplementation(files(fileTree(".reference/oneconfig-beta") { include("*.jar") }).builtBy(prepareOneConfig))
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.20")
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -45,7 +42,6 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    dependsOn(prepareOneConfig)
     // Compile with the newest JDK; target the Java 25 runtime used by OneClient.
     options.release = 25
     options.encoding = "UTF-8"

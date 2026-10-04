@@ -1,0 +1,101 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      jar: ${{ steps.version.outputs.jar }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Resolve release version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          props = dict(line.split('=', 1) for line in Path('gradle.properties').read_text().splitlines() if '=' in line and not line.startswith('#'))
+          version, mc = props['mod_version'], props['minecraft_version']
+          if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+              raise SystemExit('mod_version must be x.x.x')
+          tag = f'v{version}'
+          if os.environ['REF_TYPE'] == 'tag' and os.environ['REF_NAME'] != tag:
+              raise SystemExit(f'Tag must match gradle.properties: {tag}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\ntag={tag}\njar=orven-bw-Ornithe-{version}+mc{mc}.jar\n')
+          PY
+      - name: Build and test
+        run: ./gradlew --no-daemon clean build
+      - name: Test click debug viewer
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 scripts/test_click_debug_viewer.py
+          node --check scripts/click_debug/viewer.js
+      - name: Prepare release files
+        env:
+          JAR: ${{ steps.version.outputs.jar }}
+        run: |
+          test -f "build/libs/$JAR"
+          mkdir -p release
+          cp "build/libs/$JAR" release/
+          cd release
+          sha256sum "$JAR" > "$JAR.sha256"
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: release-jar
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    needs: build
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: release-jar
+          path: release
+      - name: Publish versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          JAR: ${{ needs.build.outputs.jar }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already published. Bump mod_version for a new release." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh release create "$TAG" "release/$JAR" "release/$JAR.sha256" \
+            --target "$COMMIT" --title "orven-bw Ornithe $VERSION" --generate-notes

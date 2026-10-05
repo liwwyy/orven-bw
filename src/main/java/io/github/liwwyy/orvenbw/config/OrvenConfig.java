@@ -169,6 +169,7 @@ public final class OrvenConfig extends Config {
     @Include public int autoSoupMoveMaxMs = 124;
     @Include public int autoSoupResponseTimeoutMs = 830;
     @Include public int autoSoupCycleCooldownMs = 330;
+    @Include public int autoSoupHoldTimeoutMs = 2000;
     @Button(title = "Clear debug cache", text = "Clear click log", description = "Erase the existing click-debug.jsonl file. Debugging continues in the same file when enabled.", category = "ClickAssist", subcategory = "Advanced")
     public void clearDebugCache() {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
@@ -349,18 +350,18 @@ public final class OrvenConfig extends Config {
         option(collected, "autoSoupDisableLeft", "Disable left click while AutoSoup", "Cancel attack clicks and block mining during soup use and automatic refill. Click Assist pauses while AutoSoup owns the hotbar.", Visualizer.SwitchVisualizer.class);
         option(collected, "autoSoupScoreboardOnly", "Scoreboard filter", "Allow AutoSoup only when the visible sidebar contains the text below. Optional and off by default.", Visualizer.SwitchVisualizer.class);
         option(collected, "autoSoupScoreboardWord", "Scoreboard matching text", "Match sidebar text ignoring case and colors. Default: mineberry.org. Also obeys General's global conditions.", Visualizer.TextVisualizer.class);
-        String[] timings = {"autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupMoveMinMs", "autoSoupMoveMaxMs", "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs"};
-        String[] titles = {"Minimum consume delay (ms)", "Maximum consume delay (ms)", "Minimum sword-return delay (ms)", "Maximum sword-return delay (ms)", "Minimum item-move delay (ms)", "Maximum item-move delay (ms)", "Server response timeout (ms)", "Cycle cooldown (ms)"};
-        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 110 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 135 ms.", "Shortest wait after using a soup before returning to a sword. Default: 113 ms.", "Longest wait before returning to a sword. Default: 135 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 113 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 124 ms. Always recheck source and destination.", "Wait this long for a soup or health update before abandoning an unconfirmed use or refill. Prevents repeated use of the same soup.", "Pause between healing/refill cycles, including failed attempts. Default: 330 ms."};
+        String[] timings = {"autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupMoveMinMs", "autoSoupMoveMaxMs", "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs", "autoSoupHoldTimeoutMs"};
+        String[] titles = {"Minimum consume delay (ms)", "Maximum consume delay (ms)", "Minimum sword-return delay (ms)", "Maximum sword-return delay (ms)", "Minimum item-move delay (ms)", "Maximum item-move delay (ms)", "Server response timeout (ms)", "Cycle cooldown (ms)", "Maximum soup hold (ms)"};
+        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 110 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 135 ms.", "Minimum sampled wait after pressing right-click before switching back. Also wait for consumption or the maximum hold. Default: 113 ms.", "Maximum sampled minimum wait after pressing right-click. Consumption can require a longer hold. Default: 135 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 113 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 124 ms. Always recheck source and destination.", "Timeout for inventory refill responses and final consumption confirmation. The maximum soup hold controls how long right-click stays pressed.", "Pause between healing/refill cycles, including failed attempts. Default: 330 ms.", "Keep right-click pressed and the soup selected until it is consumed or this limit expires. Default: 2000 ms, allowing a complete food-use animation. Slot/count changes confirm consumption; health recovery also confirms when no item is still in use."};
         for (int i = 0; i < timings.length; i++) {
             option(collected, timings[i], titles[i], descriptions[i], Visualizer.SliderVisualizer.class);
-            slider(collected, timings[i], i == 6 ? 100 : 0, i == 6 ? 3000 : 1000, 1);
+            slider(collected, timings[i], i == 6 || i == 8 ? 100 : 0, i == 8 ? 5000 : i == 6 ? 3000 : 1000, 1);
         }
         leaves(root, collected, "AutoSoup", "General", "autoSoupEnabled");
         section(root, collected, "autoSoupHealing", "Healing", "AutoSoup", "General", null, "autoSoupHealthMin", "autoSoupHealthMax", "autoSoupMaxPerCycle", "autoSoupDisableLeft");
         leaves(root, collected, "AutoSoup", "General", "autoSoupRefill");
         section(root, collected, "autoSoupConditions", "Conditions", "AutoSoup", "General", null, "autoSoupScoreboardOnly", "autoSoupScoreboardWord");
-        section(root, collected, "autoSoupUseTiming", "Consumption timing", "AutoSoup", "Advanced", null, "autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs");
+        section(root, collected, "autoSoupUseTiming", "Consumption timing", "AutoSoup", "Advanced", null, "autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupHoldTimeoutMs");
         section(root, collected, "autoSoupRefillTiming", "Refill timing", "AutoSoup", "Advanced", null, "autoSoupMoveMinMs", "autoSoupMoveMaxMs");
         section(root, collected, "autoSoupRecoveryTiming", "Response and cooldown", "AutoSoup", "Advanced", null, "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs");
         depends(collected, "autoSoupEnabled", "autoSoupHealthMin", "autoSoupHealthMax", "autoSoupMaxPerCycle", "autoSoupRefill", "autoSoupDisableLeft", "autoSoupScoreboardOnly", "autoSoupScoreboardWord");

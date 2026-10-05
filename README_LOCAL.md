@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.6.2+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.6.3+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -103,23 +103,27 @@ Minecraft's interaction manager. There is no item spoofing.
   The 0.6.1 migration adds end stone and removes explicit chest/trapped-chest/ender-chest
   entries from existing whitelists, while preserving other custom entries.
 
-## AutoSoup (0.6.2)
+## AutoSoup (0.6.3)
 
 AutoSoup starts disabled and is designed for servers where using mushroom stew heals
-instantly. It does not fabricate local healing or attempt vanilla's 1.6-second food-use
-animation. The General mod switch and global scoreboard condition still apply. Its
+instantly, and can hold right-click through vanilla's food-use animation. It never
+fabricates local healing. The General mod switch and global scoreboard condition still apply. Its
 optional feature-specific scoreboard filter is off by default and matches `mineberry.org`
 in the visible sidebar, ignoring case and colors.
 
 - **Healing:** sample one health threshold between 4 and 14 points (20 is full health)
   per cycle. At or below that threshold, choose a random hotbar soup, wait 110–135 ms,
-  use it through Minecraft's normal right-click action (block/entity/air interactions), then return to a sword after
-  113–135 ms. Prefer the original sword slot; with no sword, restore the original slot.
-  Vanilla physical-button release is suppressed only while this soup is selected and
-  awaiting its return deadline, so an unheld right mouse button cannot interrupt it.
+  queue right-click with the same `KeyBinding.click` used by Click Assist and keep
+  `KeyBinding.set` pressed while the soup remains selected. Do not return to a sword
+  merely because 113–135 ms elapsed: wait for consumption or a maximum hold of
+  2000 ms (configurable in Advanced). The sampled return delay is the minimum wait
+  after starting use. Prefer the original sword slot; with no sword, restore the
+  original slot. Native tick input handles item use/release; no direct item-use call,
+  use invoker or release redirect is used.
   Use at most two soups per cycle by default, stopping sooner if health recovers.
   Each soup must produce a health gain or an inventory/count change before another
-  soup can be selected. Unconfirmed uses time out after 830 ms.
+  soup can be selected. Unconfirmed uses stop at the hold limit; refill responses
+  time out after 830 ms.
 - **Refill:** sample a threshold of zero or one soups remaining. Open a real survival
   inventory screen only if reserve soup and an empty/bowl hotbar slot exist. Prefer
   empty slots, then bowls; leave swords, armor, crafting slots and other items alone.
@@ -292,7 +296,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.6.2**. The
+release (patch for fixes, minor for features). The current main version is **0.6.3**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 

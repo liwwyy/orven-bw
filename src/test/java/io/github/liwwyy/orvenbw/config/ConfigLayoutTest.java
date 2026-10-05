@@ -180,6 +180,7 @@ class ConfigLayoutTest {
         assertEquals("mineberry.org", config.autoSoupScoreboardWord);
         assertEquals(4, config.autoSoupHealthMin); assertEquals(14, config.autoSoupHealthMax);
         assertEquals(2, config.autoSoupMaxPerCycle);
+        assertEquals(2000, config.autoSoupHoldTimeoutMs);
         assertNotNull(getClass().getClassLoader().getResource("assets/orvenbw/icons/soup.svg"));
         for (String group : new String[]{"autoSoupUseTiming", "autoSoupRefillTiming", "autoSoupRecoveryTiming"}) {
             assertEquals("Advanced", tree.get(group).getMetadata("subcategory"));

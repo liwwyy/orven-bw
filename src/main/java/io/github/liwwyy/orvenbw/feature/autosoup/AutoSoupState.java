@@ -13,7 +13,7 @@ public final class AutoSoupState {
     }
     public record Options(double healthMin, double healthMax, int maxSoups, boolean refill,
                           int consumeMin, int consumeMax, int returnMin, int returnMax,
-                          int moveMin, int moveMax, int responseMs, int cooldownMs) {}
+                          int moveMin, int moveMax, int responseMs, int cooldownMs, int holdTimeoutMs) {}
     public record Snapshot(double health, Kind[] slots, int[] counts, int selected,
                            boolean gameplay, boolean ownInventory, boolean cursorEmpty, boolean usingItem) {}
     private final DoubleSupplier random;
@@ -25,7 +25,7 @@ public final class AutoSoupState {
     private SoupInventory.Move pendingMove;
     public AutoSoupState(DoubleSupplier random) { this.random = random; }
     public boolean busy() { return phase != Phase.IDLE; }
-    /** Keep vanilla's physical-button release from ending our pending soup use. */
+    /** The use key stays pressed until consumption is observed or its hold limit expires. */
     public boolean protectsUse(int selectedSlot) { return phase == Phase.RETURN && selectedSlot == soupSlot; }
     public int soupSlot() { return soupSlot; }
     public int originalSlot() { return original; }
@@ -83,7 +83,10 @@ public final class AutoSoupState {
         }
         if (phase == Phase.RETURN) {
             if (s.selected() != soupSlot) { abandon(now, o); return Command.NONE; }
-            if (now < due) return Command.NONE;
+            boolean consumed = s.slots()[soupSlot] != Kind.SOUP || s.counts()[soupSlot] < beforeCount;
+            boolean healed = s.health() > beforeHealth && !s.usingItem();
+            long holdLimit = consumeAt + Math.clamp(o.holdTimeoutMs(), 100, 5000) * 1_000_000L;
+            if (now < due || (!consumed && !healed && now < holdLimit)) return Command.NONE;
             phase = Phase.CONFIRM; due = consumeAt + response(o);
             return new Command(Type.SELECT, SoupInventory.swordSlot(s.slots(), original), -1);
         }

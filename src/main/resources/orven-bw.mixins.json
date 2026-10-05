@@ -13,8 +13,7 @@
     "AutoToolInputMixin",
     "InteractionManagerAccessor",
     "HitEffectsStatusMixin",
-    "AutoSoupMixin",
-    "SoupUseAccessor"
+    "AutoSoupMixin"
   ],
   "injectors": {
     "defaultRequire": 1

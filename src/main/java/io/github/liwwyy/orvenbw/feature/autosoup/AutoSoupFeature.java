@@ -5,7 +5,9 @@ import io.github.liwwyy.orvenbw.config.OrvenConfig;
 import io.github.liwwyy.orvenbw.feature.ClientFeature;
 import io.github.liwwyy.orvenbw.feature.ScoreboardGate;
 import io.github.liwwyy.orvenbw.mixin.InteractionManagerAccessor;
-import io.github.liwwyy.orvenbw.mixin.SoupUseAccessor;
+import net.minecraft.client.options.KeyBinding;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.game.inventory.SurvivalInventoryScreen;
 import net.minecraft.item.Item;
@@ -22,7 +24,7 @@ public final class AutoSoupFeature implements ClientFeature {
     private Minecraft client;
     private Object world, player;
     private SurvivalInventoryScreen ownedScreen;
-    private boolean issuingUse;
+    private int ownedUseCode = Integer.MIN_VALUE;
     public AutoSoupFeature(OrvenConfig config) { this.config = config; }
     @Override public boolean ownsScreen(Minecraft mc) {
         return ownedScreen != null && mc.screen == ownedScreen && mc.world == world && mc.player == player;
@@ -35,7 +37,6 @@ public final class AutoSoupFeature implements ClientFeature {
                 && (mc.screen == null && mc.focused || ownsScreen(mc))
                 && (!config.autoSoupScoreboardOnly || ScoreboardGate.sidebarMatches(mc, config.autoSoupScoreboardWord));
     }
-    public boolean issuingUse() { return issuingUse; }
     public boolean busy() { return config.autoSoupEnabled && state.busy(); }
     public boolean protectsUse(Minecraft mc) {
         return mc.player == player && mc.world == world && eligible(mc)
@@ -44,13 +45,20 @@ public final class AutoSoupFeature implements ClientFeature {
     }
     public boolean blocksLeft() { return busy() && config.autoSoupDisableLeft; }
     @Override public void tick(Minecraft mc) { poll(mc); }
+    @Override public void beforeInteractions(Minecraft mc) {
+        // Mouse input and Click Assist can update binding state earlier in this tick.
+        // Reassert our hold immediately before vanilla consumes the binding clicks.
+        if (ownedUseCode != Integer.MIN_VALUE && protectsUse(mc)
+                && ownedUseCode == mc.options.useKey.getKeyCode()) KeyBinding.set(ownedUseCode, true);
+        else releaseUse(mc);
+    }
     public void frame(Minecraft mc) { poll(mc); }
     private void poll(Minecraft mc) {
         if (world != mc.world || player != mc.player) {
-            state.reset(); ownedScreen = null; world = mc.world; player = mc.player;
+            releaseUse(mc); state.reset(); ownedScreen = null; world = mc.world; player = mc.player;
         }
         client = mc;
-        if (!eligible(mc)) { reset(); return; }
+        if (!eligible(mc) || ownedUseCode != Integer.MIN_VALUE && ownedUseCode != mc.options.useKey.getKeyCode()) { reset(); return; }
         Kind[] kinds = new Kind[36]; int[] counts = new int[36];
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.player.inventory.items[i]; kinds[i] = kind(stack); counts[i] = stack == null ? 0 : stack.size;
@@ -66,7 +74,7 @@ public final class AutoSoupFeature implements ClientFeature {
         }
         switch (command.type()) {
             case SELECT -> {
-                if (previousPhase == AutoSoupState.Phase.RETURN && mc.player.hasItemInUse()) mc.interactionManager.stopUsingHand(mc.player);
+                if (previousPhase == AutoSoupState.Phase.RETURN) releaseUse(mc);
                 select(mc, command.slot());
             }
             case USE -> {
@@ -96,25 +104,32 @@ public final class AutoSoupFeature implements ClientFeature {
                 if (ownedScreen != null && !state.busy()) closeOwned(mc);
             }
         }
+        if (!protectsUse(mc)) releaseUse(mc);
     }
     private void use(Minecraft mc) {
         var mod = OrvenBw.instance();
-        if (config.debugEnabled) mod.clickOrigins().beginDirectAction("auto_soup", 1, mc.options.useKey.getKeyCode(), System.nanoTime());
-        issuingUse = true;
-        try {
-            // Follow the same block/entity/air interaction path as a real right click.
-            // Vanilla skips doUse while mining, so release mining before our soup action.
-            mc.interactionManager.stopMiningBlock();
-            ((SoupUseAccessor) mc).orven$useSoup();
-        } finally {
-            issuingUse = false;
-            if (config.debugEnabled) mod.clickOrigins().endAction();
-        }
+        ownedUseCode = mc.options.useKey.getKeyCode();
+        // Exactly the autoclicker's binding queue and the button-hold's pressed state.
+        if (config.debugEnabled) mod.clickOrigins().prepare("artificial", "auto_soup", null, System.nanoTime());
+        KeyBinding.click(ownedUseCode);
+        KeyBinding.set(ownedUseCode, true);
+    }
+    private static boolean physicalDown(int code) {
+        if (code < 0) return Mouse.isCreated() && code + 100 >= 0 && code + 100 < Mouse.getButtonCount() && Mouse.isButtonDown(code + 100);
+        return Keyboard.isCreated() && code > 0 && code < Keyboard.KEYBOARD_SIZE && Keyboard.isKeyDown(code);
+    }
+    private void releaseUse(Minecraft mc) {
+        if (ownedUseCode == Integer.MIN_VALUE) return;
+        // Do not leave an unconsumed generated click queued against the restored sword.
+        if (mc != null && mc.options != null && mc.options.useKey.getKeyCode() == ownedUseCode)
+            while (mc.options.useKey.consumeClick()) { }
+        KeyBinding.set(ownedUseCode, physicalDown(ownedUseCode));
+        ownedUseCode = Integer.MIN_VALUE;
     }
     private AutoSoupState.Options options() {
         return new AutoSoupState.Options(config.autoSoupHealthMin, config.autoSoupHealthMax, config.autoSoupMaxPerCycle, config.autoSoupRefill,
                 config.autoSoupConsumeMinMs, config.autoSoupConsumeMaxMs, config.autoSoupReturnMinMs, config.autoSoupReturnMaxMs,
-                config.autoSoupMoveMinMs, config.autoSoupMoveMaxMs, config.autoSoupResponseTimeoutMs, config.autoSoupCycleCooldownMs);
+                config.autoSoupMoveMinMs, config.autoSoupMoveMaxMs, config.autoSoupResponseTimeoutMs, config.autoSoupCycleCooldownMs, config.autoSoupHoldTimeoutMs);
     }
     private static Kind kind(ItemStack stack) {
         if (stack == null || stack.size <= 0) return Kind.EMPTY;
@@ -135,6 +150,7 @@ public final class AutoSoupFeature implements ClientFeature {
         ownedScreen = null;
     }
     @Override public void reset() {
+        releaseUse(client);
         if (!state.busy() && ownedScreen == null) { state.reset(); return; }
         if (client != null && client.player == player && client.world == world && client.player != null) {
             int soup = state.soupSlot(), original = state.originalSlot();
@@ -142,7 +158,6 @@ public final class AutoSoupFeature implements ClientFeature {
                     && client.player.inventory.selectedSlot == soup && client.interactionManager != null) {
                 Kind[] kinds = new Kind[9];
                 for (int i = 0; i < 9; i++) kinds[i] = kind(client.player.inventory.items[i]);
-                if (client.player.hasItemInUse()) client.interactionManager.stopUsingHand(client.player);
                 select(client, SoupInventory.swordSlot(kinds, original));
             }
             closeOwned(client);

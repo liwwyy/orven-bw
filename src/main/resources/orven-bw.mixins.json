@@ -4,6 +4,9 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "MinecraftInputMixin",
+    "KeyBindingDebugMixin",
+    "ClickActionDebugMixin",
+    "ConnectionDebugMixin",
     "HitEffectsMixin",
     "HitEffectsRenderMixin",
     "MouseDebugMixin"

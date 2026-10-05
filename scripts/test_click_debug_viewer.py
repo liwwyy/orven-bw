@@ -106,6 +106,19 @@ class ViewerTests(unittest.TestCase):
         self.append(row)
         self.assertNotIn('_intended_elapsed_ms',self.cache.snapshot()['events'][-1])
 
+    def test_action_packet_and_legacy_input_rows_share_one_viewer(self):
+        self.append(event(10))
+        self.append(dict(event='action', session='one', timestamp_ms=11, elapsed_ns=11_000_000,
+                         source='physical', method='mouse', side='left', action='invoke',
+                         origin_id=1, action_id=2, monotonic_ns_text='1234567890123456789'))
+        self.append(dict(event='packet', session='one', timestamp_ms=12, elapsed_ns=12_000_000,
+                         source='physical', method='mouse', side='left', action='send',
+                         origin_id=1, action_id=2, packet_kind='entity_attack'))
+        rows = self.cache.snapshot()['events']
+        self.assertEqual(['input', 'action', 'packet'], [r['event'] for r in rows])
+        self.assertNotIn('_native_elapsed_ms', rows[1])
+        self.assertEqual(rows[1]['action_id'], rows[2]['action_id'])
+
     def test_http_page_script_and_api_are_self_contained(self):
         self.append(event(123))
         other = self.path.parent / 'other.jsonl'
@@ -117,7 +130,10 @@ class ViewerTests(unittest.TestCase):
         self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
         url = f'http://127.0.0.1:{server.server_port}'
         with urlopen(url+'/') as response:
-            self.assertIn(b'/viewer.js', response.read())
+            page = response.read()
+            self.assertIn(b'/viewer.js', page)
+            self.assertIn(b'value="action"', page)
+            self.assertIn(b'value="packet"', page)
         with urlopen(url+'/viewer.js') as response:
             self.assertIn(b'/api/events', response.read())
         with urlopen(url+'/api/events') as response:

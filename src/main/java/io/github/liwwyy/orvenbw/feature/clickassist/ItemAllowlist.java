@@ -7,6 +7,9 @@ import net.minecraft.resource.Identifier;
 /** IDs stay native OneConfig item-list values; selecting one sword opts in every sword. */
 public final class ItemAllowlist {
     private ItemAllowlist() {}
+    public static boolean allowsHand(Item held, String[] ids, boolean filterItems, boolean allowFist) {
+        return held == null ? allowFist : !filterItems || allows(held, ids);
+    }
     public static boolean allows(Item held, String[] ids) {
         if (held == null || ids == null) return false;
         boolean sword = held instanceof SwordItem;

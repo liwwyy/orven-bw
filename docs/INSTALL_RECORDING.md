@@ -1,4 +1,4 @@
-# orven-bw Click Recording 0.2.1
+# orven-bw Click Recording 0.5.1
 
 This build records your mouse clicks automatically. Click assistance, spam clicking,
 mouse-hold clicking, Button Hold, hit effects and the CPS HUD all start disabled.
@@ -8,7 +8,7 @@ mouse-hold clicking, Button Hold, hit effects and the CPS HUD all start disabled
 1. Use **OneClient 1.8.9** with OneConfig **1.2.18 or newer** and Java **25 or newer**.
 2. Close Minecraft and open that instance's `mods` folder.
 3. Remove any existing **orven-bw** jar. Keep the other OneClient dependencies installed.
-4. Add **orven-bw-Ornithe-0.2.1+mc1.8.9.jar**, then launch normally.
+4. Add **orven-bw-Ornithe-0.5.1+mc1.8.9.jar**, then launch normally.
 
 No settings changes are required. The regular and recording jars have the same mod ID;
 install just one of them at a time.
@@ -25,9 +25,11 @@ config/orven-bw/click-debug.jsonl
 ```
 
 The file appears after the first recorded click. It contains native mouse-event timing,
-millisecond observation timestamps, button states and session IDs. Restarts append to
-this one file. Menu clicks are included; the chart viewer lets you select the gameplay
-portion with its time-range controls.
+millisecond observation timestamps, button states and session IDs. In gameplay it also
+records consumed click actions and outgoing interaction packet submissions, linked by
+origin and action IDs where available. These are client-side timestamps, not server
+receipt times. Restarts append to this one file. Menu clicks are included; the chart
+viewer lets you select the gameplay portion with its time-range controls.
 
 ## Optional settings
 
@@ -43,14 +45,14 @@ queued clicks are logged separately as artificial events.
 
 ## Analyse
 
-The person analysing the file should use the viewer from the **debug/click-recording**
-branch (its native-timing support is not yet on main). It uses only Python's standard library:
+The viewer is available on both **main** and **debug/click-recording**. It uses only
+Python's standard library:
 
 ```sh
 python3 scripts/click_debug_viewer.py --log /path/to/click-debug.jsonl
 ```
 
-Open http://127.0.0.1:8765. Recording sessions default to **Native mouse timing**,
-which uses event-to-event differences rather than Minecraft's buffered-input processing
-times. Select **Minecraft observation timing** to compare the processing view or inspect
-generated clicks. Hover details identify missing-native-time fallback records.
+Open http://127.0.0.1:8765. Compare native input, planned artificial clicks, observed
+queue clicks, consumed actions and outgoing packet submissions with the stage selector.
+Native mouse timing uses event-to-event differences rather than Minecraft's buffered
+input processing times. Hover details identify missing-native-time fallback records.

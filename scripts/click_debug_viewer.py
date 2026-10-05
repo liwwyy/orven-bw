@@ -39,7 +39,7 @@ class LogCache:
             except (ValueError, TypeError, KeyError, OverflowError):
                 pass
         # Native clocks have no absolute origin. Anchor differences within one session.
-        if row.get('source') != 'physical' or row.get('method') != 'mouse':
+        if row.get('event') != 'input' or row.get('source') != 'physical' or row.get('method') != 'mouse' or row.get('action') not in ('press', 'release'):
             return row
         session = row['session']
         state = self.clocks.setdefault(session, dict(segment=0, anchor=None, last=None))
@@ -107,7 +107,7 @@ class LogCache:
                                 raise ValueError('Expected an object')
                             if row.get('event') == 'session_start' and isinstance(row.get('session'), str):
                                 self.sessions[row['session']] = row
-                            if row.get('event') == 'input':
+                            if row.get('event') in ('input', 'action', 'packet'):
                                 if not isinstance(row.get('timestamp_ms'), (int, float)) or not math.isfinite(row['timestamp_ms']) or not isinstance(row.get('session'), str):
                                     raise ValueError('Missing timestamp/session')
                                 self.rows.append(self.annotate(row))

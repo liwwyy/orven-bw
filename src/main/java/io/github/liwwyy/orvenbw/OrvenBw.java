@@ -18,6 +18,7 @@ public final class OrvenBw implements ClientModInitializer {
     private ClickAssistFeature clickAssist;
     private HitEffectsFeature hitEffects;
     private io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog;
+    private io.github.liwwyy.orvenbw.debug.ClickOriginTracker clickOrigins;
 
     @Override public void onInitializeClient() {
         config = new OrvenConfig();
@@ -25,7 +26,8 @@ public final class OrvenBw implements ClientModInitializer {
         debugLog = new io.github.liwwyy.orvenbw.debug.ClickDebugLog(
                 net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("orven-bw/click-debug.jsonl"),
                 () -> config.debugEnabled, error -> LOGGER.warn("Click debug log could not be written", error),
-                net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("orven-bw").orElseThrow().getMetadata().getVersion().getFriendlyString());
+                net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("orven-bw").map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("unknown"));
+        clickOrigins = new io.github.liwwyy.orvenbw.debug.ClickOriginTracker(debugLog);
         Runtime.getRuntime().addShutdownHook(new Thread(debugLog::close, "orven-bw-debug-shutdown"));
         clickAssist = new ClickAssistFeature(config);
         features.register(clickAssist);
@@ -44,6 +46,7 @@ public final class OrvenBw implements ClientModInitializer {
     }
 
     public io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog() { return debugLog; }
+    public io.github.liwwyy.orvenbw.debug.ClickOriginTracker clickOrigins() { return clickOrigins; }
     public static OrvenBw instance() { return instance; }
     public FeatureRegistry features() { return features; }
     public OrvenConfig config() { return config; }

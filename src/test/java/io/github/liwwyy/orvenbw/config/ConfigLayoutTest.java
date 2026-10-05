@@ -31,7 +31,7 @@ class ConfigLayoutTest {
             categories.add(node.getMetadata("category"));
             if ("ClickAssist".equals(node.getMetadata("category"))) sections.add(node.getMetadata("subcategory"));
         }
-        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool"), java.util.List.copyOf(categories));
+        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup"), java.util.List.copyOf(categories));
         assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "Advanced", "HUD"), java.util.List.copyOf(sections));
         for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind"}) {
             assertNotNull(tree.get(field).getMetadata("visualizer"), field);
@@ -85,7 +85,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(6, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(7, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -112,7 +112,7 @@ class ConfigLayoutTest {
         assertNotNull(tree.get("heldFilters", "heldCrouchCancel")); assertTrue(config.heldCrouchCancel);
         assertEquals(true, tree.get("rockyRamp").getMetadata("hidden"));
         String lastAdvanced = null;
-        for (Node node : tree.map.values()) if ("Advanced".equals(node.getMetadata("subcategory"))) lastAdvanced=node.getID();
+        for (Node node : tree.map.values()) if ("ClickAssist".equals(node.getMetadata("category")) && "Advanced".equals(node.getMetadata("subcategory"))) lastAdvanced=node.getID();
         assertEquals("debug", lastAdvanced); assertFalse(config.debugEnabled);
         assertNotNull(tree.get("debug", "clearDebugCache").getMetadata("runnable"));
         config.configSchema=4; config.mediumCps=11.1; config.swords=false;
@@ -172,5 +172,29 @@ class ConfigLayoutTest {
         }
         config.configSchema = 5; config.hitEffectDurationMs = 500;
         assertTrue(config.migrateValues()); assertEquals(350, config.hitEffectDurationMs);
+    }
+    @Test void autoSoupDefaultsTimingPlacementDependenciesAndWhitelistMigration() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        assertFalse(config.autoSoupEnabled); assertFalse(config.autoSoupScoreboardOnly);
+        assertTrue(config.autoSoupRefill); assertTrue(config.autoSoupDisableLeft);
+        assertEquals("mineberry.org", config.autoSoupScoreboardWord);
+        assertEquals(4, config.autoSoupHealthMin); assertEquals(14, config.autoSoupHealthMax);
+        assertEquals(2, config.autoSoupMaxPerCycle);
+        assertNotNull(getClass().getClassLoader().getResource("assets/orvenbw/icons/soup.svg"));
+        for (String group : new String[]{"autoSoupUseTiming", "autoSoupRefillTiming", "autoSoupRecoveryTiming"}) {
+            assertEquals("Advanced", tree.get(group).getMetadata("subcategory"));
+            for (Node node : ((Tree) tree.get(group)).map.values()) assertEquals(Property.Display.HIDDEN, ((Property<?>) node).getDisplay());
+        }
+        tree.getProp("autoSoupEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("autoSoupUseTiming", "autoSoupConsumeMinMs").getDisplay());
+        assertEquals(Property.Display.HIDDEN, tree.getProp("autoSoupConditions", "autoSoupScoreboardWord").getDisplay());
+        tree.getProp("autoSoupConditions", "autoSoupScoreboardOnly").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("autoSoupConditions", "autoSoupScoreboardWord").getDisplay());
+        tree.getProp("autoSoupRefill").setAs(false);
+        assertEquals(Property.Display.HIDDEN, tree.getProp("autoSoupRefillTiming", "autoSoupMoveMinMs").getDisplay());
+        config.configSchema = 6; config.autoToolWhitelist = new String[]{"minecraft:planks", "minecraft:chest", "trapped_chest", "minecraft:ender_chest", "test:custom"};
+        assertTrue(config.migrateValues()); assertEquals(7, config.configSchema);
+        assertArrayEquals(new String[]{"minecraft:planks", "test:custom", "minecraft:end_stone"}, config.autoToolWhitelist);
+        assertFalse(config.migrateValues());
     }
 }

@@ -57,6 +57,14 @@ public final class ClickOriginTracker {
         log.action(origin.source(), origin.method(), active.side(), origin.id(), active.id(), now);
         return active;
     }
+    /** Direct item-use actions do not consume or disturb vanilla's pending binding origins. */
+    public void beginDirectAction(String method, int side, int keyCode, long now) {
+        Origin origin = new Origin(++nextId, "artificial", method, null, now, now);
+        String button = side == 0 ? "left" : "right";
+        log.generated(method, button, keyCode, null, now, now, origin.id());
+        active = new Action(++nextActionId, origin, button);
+        log.action(origin.source(), origin.method(), button, origin.id(), active.id(), now);
+    }
 
     public void packet(String side, String kind, long now) {
         Action action = active;

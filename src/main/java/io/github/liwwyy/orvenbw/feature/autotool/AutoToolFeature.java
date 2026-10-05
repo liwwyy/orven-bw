@@ -25,9 +25,13 @@ public final class AutoToolFeature implements ClientFeature {
     private Object world, player;
     public AutoToolFeature(OrvenConfig config) { this.config = config; }
     private boolean eligible(Minecraft mc) {
-        return config.autoToolEnabled && ScoreboardGate.allows(mc, config) && mc.player != null && mc.world != null
+        return config.autoToolEnabled && soupInactive() && ScoreboardGate.allows(mc, config) && mc.player != null && mc.world != null
                 && mc.interactionManager != null && mc.screen == null && mc.focused && !mc.isPaused()
                 && mc.player.isAlive() && !mc.player.isSpectator() && mc.player.abilities.canModifyWorld;
+    }
+    private static boolean soupInactive() {
+        var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+        return mod == null || !mod.autoSoup().busy();
     }
     @Override public void beforeInteractions(Minecraft mc) {
         if (world != mc.world || player != mc.player) { state.reset(); world = mc.world; player = mc.player; }

@@ -66,6 +66,18 @@ public final class ClickAssistFeature implements ClientFeature {
         if (bindSignature != null && !bindSignature.equals(signature)) reset();
         bindSignature = signature;
         if (!commonEligible(mc)) { reset(); return; }
+        var soupMod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+        if (soupMod != null && soupMod.autoSoup().busy()) {
+            for (int button = 0; button < 2; button++) {
+                engine.cancel(button); sessions[button].reset(); heldTriggers[button].reset();
+                sources[button] = -1; profiles[button] = null;
+                if (ownsHold[button]) {
+                    KeyBinding.set(button == 0 ? attackCode : useCode, physicalDown(button == 0 ? attackCode : useCode));
+                    ownsHold[button] = false;
+                }
+            }
+            return;
+        }
         if (lastMode != config.spamMode) {
             clearSpam();
             for (int button = 0; button < 2; button++) { sessions[button].reset(); engine.cancel(button); }

@@ -150,9 +150,25 @@ public final class OrvenConfig extends Config {
     @ItemList(title = "Ignored held items", description = "Pause AutoTool while holding any item in this list. Items match exactly.", category = "AutoTool", subcategory = "Filters")
     public String[] autoToolIgnoredItems = {};
     @ItemList(title = "Allowed blocks", description = "Select block items. One wool, glass or hardened-clay entry includes every color; one wooden block includes the wood family. Non-block items are ignored.", category = "AutoTool", subcategory = "Filters")
-    public String[] autoToolWhitelist = {"minecraft:wool", "minecraft:sandstone", "minecraft:glass", "minecraft:ladder", "minecraft:planks", "minecraft:log", "minecraft:obsidian", "minecraft:hardened_clay"};
+    public String[] autoToolWhitelist = {"minecraft:wool", "minecraft:sandstone", "minecraft:glass", "minecraft:ladder", "minecraft:planks", "minecraft:log", "minecraft:obsidian", "minecraft:hardened_clay", "minecraft:end_stone"};
     @ItemList(title = "Blocked blocks", description = "Never switch for these block families, even if allowed above. Uses the same color and wood grouping as the whitelist.", category = "AutoTool", subcategory = "Filters")
     public String[] autoToolBlacklist = {};
+    @Include public boolean autoSoupEnabled = false;
+    @Include public double autoSoupHealthMin = 4;
+    @Include public double autoSoupHealthMax = 14;
+    @Include public int autoSoupMaxPerCycle = 2;
+    @Include public boolean autoSoupRefill = true;
+    @Include public boolean autoSoupDisableLeft = true;
+    @Include public boolean autoSoupScoreboardOnly = false;
+    @Include public String autoSoupScoreboardWord = "mineberry.org";
+    @Include public int autoSoupConsumeMinMs = 30;
+    @Include public int autoSoupConsumeMaxMs = 55;
+    @Include public int autoSoupReturnMinMs = 33;
+    @Include public int autoSoupReturnMaxMs = 55;
+    @Include public int autoSoupMoveMinMs = 33;
+    @Include public int autoSoupMoveMaxMs = 44;
+    @Include public int autoSoupResponseTimeoutMs = 750;
+    @Include public int autoSoupCycleCooldownMs = 250;
     @Button(title = "Clear debug cache", text = "Clear click log", description = "Erase the existing click-debug.jsonl file. Debugging continues in the same file when enabled.", category = "ClickAssist", subcategory = "Advanced")
     public void clearDebugCache() {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
@@ -169,6 +185,8 @@ public final class OrvenConfig extends Config {
     public void openClickAssist() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "ClickAssist")); }
     @Button(title = "AutoTool", text = "Open AutoTool", icon = "assets/orvenbw/icons/autotool.svg", description = "Choose the best hotbar tool for mining, with switch timing, block filters and optional switch-back.")
     public void openAutoTool() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "AutoTool")); }
+    @Button(title = "AutoSoup", text = "Open AutoSoup", icon = "assets/orvenbw/icons/soup.svg", description = "Configure automatic soup healing, hotbar refill and timing.")
+    public void openAutoSoup() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "AutoSoup")); }
     @Button(title = "Customize CPS HUD", text = "Open HUD editor", description = "Edit placement, colors, font, the CPS suffix and the dominant-side calculation.", category = "ClickAssist", subcategory = "HUD")
     public void editHud() { org.polyfrost.oneconfig.api.hud.v1.HudManager.INSTANCE.openEditor(); }
 
@@ -238,7 +256,7 @@ public final class OrvenConfig extends Config {
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
         Tree root = Tree.tree("orven-bw.json");
-        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "openAutoTool", "globalKeysInfo");
+        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "openAutoTool", "openAutoSoup", "globalKeysInfo");
         section(root, collected, "globalKeys", "Keybinds", "General", "General", null, "settingsBind", "toggleModBind");
         leaves(root, collected, "General", "General", "conditionsInfo", "scoreboardOnly", "scoreboardWord");
         leaves(root, collected, "ClickAssist", "Physical CPS Boost", "enabled", "leftClick", "rightClick");
@@ -264,6 +282,7 @@ public final class OrvenConfig extends Config {
         section(root, collected, "debug", "Debugging", "ClickAssist", "Advanced", "debugEnabled", "clearDebugCache");
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
         buildAutoTool(root, collected);
+        buildAutoSoup(root, collected);
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
         depends(collected, "spamWeaponOnly", "spamItems");
@@ -303,7 +322,7 @@ public final class OrvenConfig extends Config {
         option(collected, "autoToolSwitchBack", "Switch back when done", "Restore the previous slot after releasing the mouse, looking away, or no longer meeting the conditions. Off by default.", Visualizer.SwitchVisualizer.class);
         option(collected, "autoToolOverrideSwitchBack", "Override switch-back slot", "While AutoTool owns the slot, number keys and scrolling update the slot to restore when done instead of interrupting mining.", Visualizer.SwitchVisualizer.class);
         option(collected, "autoToolIgnoreHeldItems", "Held item blacklist", "Pause switching while holding an item selected below. Pauses during right-click item use regardless of this setting.", Visualizer.SwitchVisualizer.class);
-        option(collected, "autoToolWhitelistEnabled", "Block whitelist", "Switch tools only for the selected block families. Starts with wool, sandstone, glass, ladders, wood, obsidian and hardened clay.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolWhitelistEnabled", "Block whitelist", "Switch tools only for the selected block families. Includes end stone; the wood family excludes chests and ladders.", Visualizer.SwitchVisualizer.class);
         option(collected, "autoToolBlacklistEnabled", "Block blacklist", "Prevent tool switching for the selected block families. The blacklist takes priority over the whitelist.", Visualizer.SwitchVisualizer.class);
         leaves(root, collected, "AutoTool", "General", "autoToolEnabled");
         section(root, collected, "autoToolConditions", "Conditions", "AutoTool", "General", null, "autoToolOnlyCrouching", "autoToolRequireLeftMouse");
@@ -317,6 +336,37 @@ public final class OrvenConfig extends Config {
         depends(collected, "autoToolIgnoreHeldItems", "autoToolIgnoredItems");
         depends(collected, "autoToolWhitelistEnabled", "autoToolWhitelist");
         depends(collected, "autoToolBlacklistEnabled", "autoToolBlacklist");
+    }
+    private static void buildAutoSoup(Tree root, Tree collected) {
+        option(collected, "autoSoupEnabled", "Enable AutoSoup", "Use random hotbar soups when health is low, then return to a sword. Intended for servers where right-clicking soup heals instantly. Off by default.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoSoupHealthMin", "Minimum health threshold", "Lowest possible activation health, in health points (20 = full health). A threshold is sampled once per cycle between this and the maximum.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoSoupHealthMin", 1, 20, .5f);
+        option(collected, "autoSoupHealthMax", "Maximum health threshold", "Highest possible activation health. Heal at or below the sampled threshold; stop the cycle when health rises above it.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoSoupHealthMax", 1, 20, .5f);
+        option(collected, "autoSoupMaxPerCycle", "Soups per cycle", "Maximum soups to use in one healing cycle. Stops sooner when health recovers. Default: 2.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoSoupMaxPerCycle", 1, 9, 1);
+        option(collected, "autoSoupRefill", "Refill hotbar", "At a randomly chosen zero or one soups remaining, open your inventory and swap reserve soup into empty slots or bowls. Preserves swords and other items; never enables inventory movement.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoSoupDisableLeft", "Disable left click while AutoSoup", "Cancel attack clicks and block mining during soup use and automatic refill. Click Assist pauses while AutoSoup owns the hotbar.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoSoupScoreboardOnly", "Scoreboard filter", "Allow AutoSoup only when the visible sidebar contains the text below. Optional and off by default.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoSoupScoreboardWord", "Scoreboard matching text", "Match sidebar text ignoring case and colors. Default: mineberry.org. Also obeys General's global conditions.", Visualizer.TextVisualizer.class);
+        String[] timings = {"autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupMoveMinMs", "autoSoupMoveMaxMs", "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs"};
+        String[] titles = {"Minimum consume delay (ms)", "Maximum consume delay (ms)", "Minimum sword-return delay (ms)", "Maximum sword-return delay (ms)", "Minimum item-move delay (ms)", "Maximum item-move delay (ms)", "Server response timeout (ms)", "Cycle cooldown (ms)"};
+        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 30 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 55 ms.", "Shortest wait after using a soup before returning to a sword. Default: 33 ms.", "Longest wait before returning to a sword. Default: 55 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 33 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 44 ms. Always recheck source and destination.", "Wait this long for a soup or health update before abandoning an unconfirmed use or refill. Prevents repeated use of the same soup.", "Pause between healing/refill cycles, including failed attempts. Default: 250 ms."};
+        for (int i = 0; i < timings.length; i++) {
+            option(collected, timings[i], titles[i], descriptions[i], Visualizer.SliderVisualizer.class);
+            slider(collected, timings[i], i == 6 ? 100 : 0, i == 6 ? 3000 : 1000, 1);
+        }
+        leaves(root, collected, "AutoSoup", "General", "autoSoupEnabled");
+        section(root, collected, "autoSoupHealing", "Healing", "AutoSoup", "General", null, "autoSoupHealthMin", "autoSoupHealthMax", "autoSoupMaxPerCycle", "autoSoupDisableLeft");
+        leaves(root, collected, "AutoSoup", "General", "autoSoupRefill");
+        section(root, collected, "autoSoupConditions", "Conditions", "AutoSoup", "General", null, "autoSoupScoreboardOnly", "autoSoupScoreboardWord");
+        section(root, collected, "autoSoupUseTiming", "Consumption timing", "AutoSoup", "Advanced", null, "autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs");
+        section(root, collected, "autoSoupRefillTiming", "Refill timing", "AutoSoup", "Advanced", null, "autoSoupMoveMinMs", "autoSoupMoveMaxMs");
+        section(root, collected, "autoSoupRecoveryTiming", "Response and cooldown", "AutoSoup", "Advanced", null, "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs");
+        depends(collected, "autoSoupEnabled", "autoSoupHealthMin", "autoSoupHealthMax", "autoSoupMaxPerCycle", "autoSoupRefill", "autoSoupDisableLeft", "autoSoupScoreboardOnly", "autoSoupScoreboardWord");
+        depends(collected, "autoSoupEnabled", timings);
+        depends(collected, "autoSoupScoreboardOnly", "autoSoupScoreboardWord");
+        depends(collected, "autoSoupRefill", "autoSoupMoveMinMs", "autoSoupMoveMaxMs");
     }
     private static void option(Tree tree, String id, String title, String description, Class<?> visualizer) {
         Node node = tree.get(id);
@@ -362,10 +412,20 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 6) return false;
+        if (configSchema >= 7) return false;
+        if (configSchema == 6) {
+            var updated = new java.util.LinkedHashSet<String>();
+            if (autoToolWhitelist != null) for (String id : autoToolWhitelist) {
+                if (id == null) continue;
+                String name = id.replace("minecraft:", "");
+                if (!java.util.Set.of("chest", "trapped_chest", "ender_chest").contains(name)) updated.add(id);
+            }
+            updated.add("minecraft:end_stone"); autoToolWhitelist = updated.toArray(String[]::new);
+            configSchema = 7; return true;
+        }
         if (configSchema == 5) {
             if (hitEffectDurationMs == 500) hitEffectDurationMs = 350;
-            configSchema = 6; return true;
+            configSchema = 6; migrateValues(); return true;
         }
         if (configSchema == 4) { migrateItems(); configSchema = 5; migrateValues(); return true; }
         if (configSchema < 2) {

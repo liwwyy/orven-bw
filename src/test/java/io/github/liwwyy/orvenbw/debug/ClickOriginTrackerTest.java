@@ -57,4 +57,20 @@ class ClickOriginTrackerTest {
             assertEquals(0, tracker.beginAction(0, System.nanoTime()).origin().id());
         }
     }
+    @Test void directSoupUseLogsItsPacketWithoutStealingPhysicalBindingOrigins() throws Exception {
+        Path path = temp.resolve("click-debug.jsonl");
+        try (var log = new ClickDebugLog(path, () -> true, failure -> fail(failure))) {
+            var tracker = new ClickOriginTracker(log); long now = System.nanoTime();
+            tracker.prepare("physical", "mouse", null, -1);
+            var physical = tracker.queued(1, -99, now);
+            tracker.consumed(1);
+            tracker.beginDirectAction("auto_soup", 1, -99, now + 1);
+            tracker.packet("right", "use", now + 2); tracker.endAction();
+            assertEquals(physical.id(), tracker.beginAction(1, now + 3).origin().id()); tracker.endAction();
+        }
+        var rows = Files.readAllLines(path).stream().map(line -> JsonParser.parseString(line).getAsJsonObject()).toList();
+        var packet = rows.stream().filter(row -> "packet".equals(row.get("event").getAsString())).findFirst().orElseThrow();
+        assertEquals("auto_soup", packet.get("method").getAsString());
+        assertEquals("artificial", packet.get("source").getAsString());
+    }
 }

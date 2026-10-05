@@ -25,6 +25,9 @@ class BlockFamiliesTest {
         Block log = register(22005, "minecraft:log2", Material.WOOD);
         Block ladder = register(22006, "minecraft:ladder", Material.WOOD);
         Block stone = register(22007, "test:stone", Material.STONE);
+        Block chest = register(22008, "minecraft:chest", Material.WOOD);
+        Block trapped = register(22009, "minecraft:trapped_chest", Material.WOOD);
+        Block ender = register(22010, "minecraft:ender_chest", Material.STONE);
         assertTrue(BlockFamilies.matches(stained, new String[]{"minecraft:glass"}));
         assertTrue(BlockFamilies.matches(glass, new String[]{"minecraft:stained_glass"}));
         assertTrue(BlockFamilies.matches(stainedClay, new String[]{"minecraft:hardened_clay"}));
@@ -35,5 +38,6 @@ class BlockFamiliesTest {
         assertFalse(BlockFamilies.matches(stone, new String[]{"minecraft:planks"}));
         assertTrue(BlockFamilies.matches(ladder, new String[]{"minecraft:ladder"}));
         assertFalse(BlockFamilies.matches(stone, new String[]{"invalid::id", "missing:block"}));
+        for (Block container : new Block[]{chest, trapped, ender}) assertFalse(BlockFamilies.matches(container, new String[]{"minecraft:planks"}));
     }
 }

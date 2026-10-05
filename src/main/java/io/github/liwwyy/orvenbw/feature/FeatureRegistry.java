@@ -11,7 +11,10 @@ public final class FeatureRegistry {
     private boolean active;
 
     public void reset() { for (ClientFeature feature : features) feature.reset(); }
-    public void checkContext(Minecraft client) { syncContext(client); }
+    public void checkContext(Minecraft client) {
+        syncContext(client);
+        for (ClientFeature feature : features) feature.tick(client);
+    }
     public void register(ClientFeature feature) { features.add(feature); }
     public void onInput(Minecraft client, int keyCode) {
         if (syncContext(client)) for (ClientFeature f : features) f.onInput(client, keyCode);
@@ -20,9 +23,12 @@ public final class FeatureRegistry {
         if (syncContext(client)) for (ClientFeature f : features) f.beforeInteractions(client);
     }
     private boolean syncContext(Minecraft client) {
-        boolean ready = (io.github.liwwyy.orvenbw.OrvenBw.instance() == null || ScoreboardGate.allows(client, io.github.liwwyy.orvenbw.OrvenBw.instance().config())) && client.world != null && client.player != null && client.screen == null && client.focused && !client.isPaused();
-        if (!ready || world != client.world || player != client.player) {
-            if (active || world != client.world || player != client.player) for (ClientFeature f : features) f.reset();
+        boolean global = io.github.liwwyy.orvenbw.OrvenBw.instance() == null || ScoreboardGate.allows(client, io.github.liwwyy.orvenbw.OrvenBw.instance().config());
+        boolean changed = world != client.world || player != client.player;
+        boolean ready = global && client.world != null && client.player != null && client.screen == null && client.focused && !client.isPaused();
+        if (!ready || changed) {
+            if (active || changed) for (ClientFeature f : features)
+                if (changed || !global || client.isPaused() || !f.ownsScreen(client)) f.reset();
         }
         world = client.world;
         player = client.player;

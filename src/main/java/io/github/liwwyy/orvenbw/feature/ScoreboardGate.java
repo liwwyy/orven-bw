@@ -14,6 +14,9 @@ public final class ScoreboardGate {
     public static boolean allows(Minecraft mc, OrvenConfig config) {
         if (!config.modEnabled) return false;
         if (!config.scoreboardOnly) return true;
+        return sidebarMatches(mc, config.scoreboardWord);
+    }
+    public static boolean sidebarMatches(Minecraft mc, String word) {
         if (mc.world == null || mc.player == null) return false;
         var board = mc.world.getScoreboard();
         ScoreboardObjective objective = null;
@@ -31,7 +34,7 @@ public final class ScoreboardGate {
             String owner = scores.get(i).getOwner();
             visible.add(Team.getMemberDisplayName(board.getTeamOfMember(owner), owner));
         }
-        return matches(visible, config.scoreboardWord);
+        return matches(visible, word);
     }
     public static boolean matches(List<String> lines, String word) {
         if (word == null || word.isBlank()) return false;

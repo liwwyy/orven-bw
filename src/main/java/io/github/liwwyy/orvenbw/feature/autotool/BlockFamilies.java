@@ -30,6 +30,8 @@ public final class BlockFamilies {
         String id = key == null ? "" : key.toString();
         if (id.equals("minecraft:glass") || id.equals("minecraft:stained_glass")) return "glass";
         if (id.equals("minecraft:hardened_clay") || id.equals("minecraft:stained_hardened_clay")) return "clay";
-        return !id.equals("minecraft:ladder") && block.getMaterial() == Material.WOOD ? "wood" : null;
+        return !id.equals("minecraft:ladder") && !id.equals("minecraft:chest")
+                && !id.equals("minecraft:trapped_chest") && !id.equals("minecraft:ender_chest")
+                && block.getMaterial() == Material.WOOD ? "wood" : null;
     }
 }

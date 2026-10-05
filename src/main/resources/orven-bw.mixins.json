@@ -12,7 +12,8 @@
     "MouseDebugMixin",
     "AutoToolInputMixin",
     "InteractionManagerAccessor",
-    "HitEffectsStatusMixin"
+    "HitEffectsStatusMixin",
+    "AutoSoupMixin"
   ],
   "injectors": {
     "defaultRequire": 1

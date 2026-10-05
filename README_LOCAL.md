@@ -5,13 +5,13 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.6.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.6.1+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
 Press **P** to open General. New profiles start with the mod **off**; existing profiles
 retain their saved enabled state. General comes first and ClickAssist comes second.
-AutoTool comes third. The icon-bearing shortcut buttons in General open each feature page.
+AutoTool comes third and AutoSoup fourth. The icon-bearing shortcut buttons in General open each feature page.
 
 General includes the mod switch, a collapsed **Global Keybinds** menu for opening
 settings and toggling the whole mod, and **Conditions** with optional scoreboard
@@ -96,10 +96,52 @@ Minecraft's interaction manager. There is no item spoofing.
 - **Filters:** optional held-item blacklist, block whitelist and block blacklist use
   editable OneConfig item pickers. Select block items for block lists; non-block
   entries are ignored. The blacklist wins. The whitelist is on by default with wool,
-  sandstone, glass, ladders, planks/logs, obsidian and hardened clay. Legacy colors
+  sandstone, glass, ladders, planks/logs, obsidian, hardened clay and end stone. Legacy colors
   match automatically; normal/stained glass and normal/stained hardened clay share
-  families. Selecting any wooden block includes all wood-material blocks except ladders,
-  which have their own entry. This includes all plank and log variants.
+  families. Selecting any wooden block includes wood-material blocks except ladders and
+  chest variants. Ladders have their own entry. This includes all plank and log variants.
+  The 0.6.1 migration adds end stone and removes explicit chest/trapped-chest/ender-chest
+  entries from existing whitelists, while preserving other custom entries.
+
+## AutoSoup (0.6.1)
+
+AutoSoup starts disabled and is designed for servers where using mushroom stew heals
+instantly. It does not fabricate local healing or attempt vanilla's 1.6-second food-use
+animation. The General mod switch and global scoreboard condition still apply. Its
+optional feature-specific scoreboard filter is off by default and matches `mineberry.org`
+in the visible sidebar, ignoring case and colors.
+
+- **Healing:** sample one health threshold between 4 and 14 points (20 is full health)
+  per cycle. At or below that threshold, choose a random hotbar soup, wait 30–55 ms,
+  use it through Minecraft's normal interaction manager, then return to a sword after
+  33–55 ms. Prefer the original sword slot; with no sword, restore the original slot.
+  Use at most two soups per cycle by default, stopping sooner if health recovers.
+  Each soup must produce a health gain or an inventory/count change before another
+  soup can be selected. Unconfirmed uses time out after 750 ms.
+- **Refill:** sample a threshold of zero or one soups remaining. Open a real survival
+  inventory screen only if reserve soup and an empty/bowl hotbar slot exist. Prefer
+  empty slots, then bowls; leave swords, armor, crafting slots and other items alone.
+  Move one reserve soup stack with a normal hotbar-swap inventory action at a time,
+  with 33–44 ms sampled between actions. Bowls return to the source slot rather than
+  being discarded. Recompute each move from the current inventory. Rejected/stale
+  moves time out. Close only the screen AutoSoup opened; user screens and held cursor
+  items cancel automation and remain untouched. Inventory movement is never enabled.
+- **Controls:** optional left-click cancellation (on by default) blocks attacks and
+  ongoing block mining throughout healing/refill. Click Assist and AutoTool pause
+  while AutoSoup owns the hotbar. Manual slot changes cancel pending use; disabling
+  the feature, death, world/player changes and lost gameplay context cancel the cycle.
+- **Advanced:** all consume, sword-return, item-move, response-timeout and cycle-cooldown
+  timings are here, in collapsed groups. The cycle cooldown defaults to 250 ms.
+  Deadlines run on the client thread at tick/frame boundaries, without sleeps or a
+  background thread; actual execution can be later than the sampled delay at low FPS.
+
+Reference: Meteor's [InventorySorter](https://github.com/MeteorDevelopment/meteor-client/blob/master/src/main/java/meteordevelopment/meteorclient/utils/player/InventorySorter.java),
+[InvUtils](https://github.com/MeteorDevelopment/meteor-client/blob/master/src/main/java/meteordevelopment/meteorclient/utils/player/InvUtils.java)
+and [SlotUtils](https://github.com/MeteorDevelopment/meteor-client/blob/master/src/main/java/meteordevelopment/meteorclient/utils/player/SlotUtils.java).
+The implementation adapts delayed inventory planning and menu-slot mapping to the
+verified 1.8.9 PlayerMenu (main inventory IDs 9–35, hotbar IDs 36–44). A targeted mode-2
+hotbar swap avoids a multi-click cursor transaction and keeps non-soup items in place.
+
 ## Sample-fitted clicking profiles (0.3.0)
 
 ClickAssist → Advanced → **Clicking behavior** replaces the old three-level bag,
@@ -248,7 +290,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.6.0**. The
+release (patch for fixes, minor for features). The current main version is **0.6.1**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 

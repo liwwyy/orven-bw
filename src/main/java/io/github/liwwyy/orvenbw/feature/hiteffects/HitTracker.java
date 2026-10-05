@@ -9,7 +9,7 @@ public final class HitTracker {
     private final ArrayDeque<Attempt> attempts = new ArrayDeque<>();
     private Object target;
     private double health, damage;
-    private int combo, displayCombo;
+    private int combo, displayCombo, criticalStreak;
     private long lastHit;
     private boolean critical, initialized;
     public void attack(Object entity, double currentHealth, boolean critical, long now, long comboReset) {
@@ -21,7 +21,7 @@ public final class HitTracker {
     public boolean observe(double currentHealth, long now, long comboReset) {
         if (!Double.isFinite(currentHealth)) return false;
         expire(now);
-        if (combo > 0 && now - lastHit >= comboReset) combo = 0;
+        if (combo > 0 && now - lastHit >= comboReset) { combo = 0; criticalStreak = 0; }
         double drop = initialized ? health - currentHealth : 0;
         health = Math.max(0, currentHealth); initialized = true;
         if (drop <= 0.001 || attempts.isEmpty()) return false;
@@ -29,6 +29,7 @@ public final class HitTracker {
         Attempt matched = attempts.removeFirst();
         attempts.clear();
         damage = drop; critical = matched.critical(); combo++; displayCombo = combo; lastHit = now;
+        criticalStreak = critical ? criticalStreak + 1 : 0;
         return true;
     }
     private void expire(long now) {
@@ -38,7 +39,8 @@ public final class HitTracker {
     public int lastCombo() { return displayCombo; }
     public double damage() { return damage; }
     public boolean critical() { return critical; }
+    public int criticalStreak() { return criticalStreak; }
     public long lastHit() { return lastHit; }
     public int color() { return critical ? 0xFFD166 : displayCombo >= 5 ? 0xC792EA : displayCombo >= 3 ? 0xFFAD66 : 0x7EE0A1; }
-    public void reset() { target = null; attempts.clear(); combo = displayCombo = 0; health = damage = 0; initialized = critical = false; lastHit = 0; }
+    public void reset() { target = null; attempts.clear(); combo = displayCombo = criticalStreak = 0; health = damage = 0; initialized = critical = false; lastHit = 0; }
 }

@@ -31,10 +31,14 @@ class HitTrackerTest {
         assertEquals(3, tracker.combo()); assertEquals(0xFFAD66, tracker.color());
         tracker.attack(target, 17, true, 1000*MS, RESET); tracker.observe(15, 1100*MS, RESET);
         assertTrue(tracker.critical()); assertEquals(0xFFD166, tracker.color());
-        tracker.observe(15, 2600*MS, RESET); assertEquals(0, tracker.combo());
-        assertEquals(4, tracker.lastCombo(), "The last popup outlives the combo reset if its animation lasts longer");
-        tracker.attack(new Object(), 20, false, 2700*MS, RESET); assertEquals(0, tracker.combo());
-        tracker.reset(); assertFalse(tracker.observe(18, 2800*MS, RESET)); assertEquals(0, tracker.combo());
+        assertEquals(1, tracker.criticalStreak());
+        tracker.attack(target, 15, true, 1200*MS, RESET); tracker.observe(13, 1300*MS, RESET);
+        assertEquals(2, tracker.criticalStreak());
+        tracker.observe(15, 2900*MS, RESET); assertEquals(0, tracker.combo());
+        assertEquals(0, tracker.criticalStreak());
+        assertEquals(5, tracker.lastCombo(), "The last popup outlives the combo reset if its animation lasts longer");
+        tracker.attack(new Object(), 20, false, 3000*MS, RESET); assertEquals(0, tracker.combo());
+        tracker.reset(); assertFalse(tracker.observe(18, 3100*MS, RESET)); assertEquals(0, tracker.combo());
     }
     @Test void batchedDamageDoesNotInventMultipleRegisteredHits() {
         var tracker = new HitTracker(); var target = new Object();

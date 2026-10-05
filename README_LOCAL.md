@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.3.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.4.0+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -37,9 +37,12 @@ ClickAssist is arranged in this order:
 - **Button Hold:** embedded enable switch with unassigned left/right toggle binds.
   Latches vanilla attack/use state until toggled off and suppresses generated clicks on
   its side. Its synthetic state cannot activate mouse-hold spam.
-- **Hit effects:** floating observed-hit count and damage below target health, without
-  a heart icon. Normal hits are green, combos of three orange, combos of five purple,
-  and critical hits gold. Customize combo reset, animation duration and vertical offset.
+- **Hit effects:** shows `❤ 10/10` in red under the crosshair, with a separate health
+  toggle. The NPC filter is enabled by default: targets absent from the server tab list
+  have no health display or hit popup. Confirmed hits fly randomly left or right from
+  the crosshair, briefly vibrate, and fade in 500 ms by default. Weak hits below one
+  health point show WEAK; critical hits show CRIT, including a consecutive critical
+  count. Customize combo reset, animation duration and vertical offset.
 - **Advanced:** shared fitted clicking behavior and the first-boost delay, plus
   native editable item lists for each clicking mode, then Debugging at the bottom.
   Groups start collapsed.
@@ -202,7 +205,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current standard version is **0.3.0**. The
+release (patch for fixes, minor for features). The current standard version is **0.4.0**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 

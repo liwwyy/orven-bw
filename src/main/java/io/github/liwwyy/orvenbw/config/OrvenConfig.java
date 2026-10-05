@@ -117,8 +117,10 @@ public final class OrvenConfig extends Config {
     @Include public double exhaustedMinCps = 8;
     @Include public double exhaustedMaxCps = 9;
     @Include public boolean hitEffectsEnabled = false;
+    @Include public boolean hitEffectsShowHealth = true;
+    @Include public boolean hitEffectsIgnoreNpcs = true;
     @Include public int hitComboResetMs = 1500;
-    @Include public int hitEffectDurationMs = 1000;
+    @Include public int hitEffectDurationMs = 500;
     @Include public int hitEffectOffsetY = 18;
 
     @Include public boolean heldCrouchCancel = true;
@@ -195,9 +197,11 @@ public final class OrvenConfig extends Config {
         option(collected, "holdLeftBind", "Toggle left hold", "Press once to hold the attack binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
         option(collected, "holdRightBind", "Toggle right hold", "Press once to hold the use binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
         option(collected, "hitEffectsEnabled", "Enable hit effects", "Show a floating hit count, observed damage and target health after your attacks. Critical hits and longer combos use different colors.", Visualizer.SwitchVisualizer.class);
+        option(collected, "hitEffectsShowHealth", "Show target health", "Display the target's current and maximum health beside a red heart under the crosshair.", Visualizer.SwitchVisualizer.class);
+        option(collected, "hitEffectsIgnoreNpcs", "Ignore players outside the tab list", "Hide health and hit popups for entities whose player name is absent from the tab list. Enabled by default; also excludes non-player mobs.", Visualizer.SwitchVisualizer.class);
         option(collected, "hitComboResetMs", "Combo reset delay (ms)", "Reset the registered-hit combo after this long without an observed hit, or when attacking a different target.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitComboResetMs", 500.0f, 5000.0f, 100.0f);
-        option(collected, "hitEffectDurationMs", "Floating text duration (ms)", "Keep the hit and damage animation visible for this long after a registered hit.", Visualizer.SliderVisualizer.class);
+        option(collected, "hitEffectDurationMs", "Floating text duration (ms)", "Time for each confirmed hit to fly left or right, briefly vibrate, and fade. Defaults to 500 ms.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitEffectDurationMs", 300.0f, 3000.0f, 100.0f);
         option(collected, "hitEffectOffsetY", "Text vertical offset", "Distance below the crosshair for health and floating hit text, in scaled screen pixels.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitEffectOffsetY", 0.0f, 100.0f, 1.0f);
@@ -220,6 +224,8 @@ public final class OrvenConfig extends Config {
                 "heldClickDelayMs", "heldClickInstant", "heldClickRequiresPlayer", "heldClickEntityOnly", "heldCrouchCancel");
         section(root, collected, "hold", "Button Hold", "ClickAssist", "Button Hold", "holdEnabled", "holdLeftBind", "holdRightBind");
         leaves(root, collected, "ClickAssist", "Hit effects", "hitEffectsEnabled");
+        section(root, collected, "hitFilters", "Display", "ClickAssist", "Hit effects", null,
+                "hitEffectsShowHealth", "hitEffectsIgnoreNpcs");
         section(root, collected, "hitOptions", "Animation", "ClickAssist", "Hit effects", null,
                 "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY");
         leaves(root, collected, "ClickAssist", "Advanced", "advancedInfo");

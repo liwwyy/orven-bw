@@ -31,12 +31,13 @@ class ConfigLayoutTest {
             categories.add(node.getMetadata("category"));
             if ("ClickAssist".equals(node.getMetadata("category"))) sections.add(node.getMetadata("subcategory"));
         }
-        assertEquals(java.util.List.of("General", "ClickAssist"), java.util.List.copyOf(categories));
+        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool"), java.util.List.copyOf(categories));
         assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "Advanced", "HUD"), java.util.List.copyOf(sections));
-        for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind", "heldClickEnabled", "heldClickLeft", "heldClickRight"}) {
+        for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind"}) {
             assertNotNull(tree.get(field).getMetadata("visualizer"), field);
             assertNull(tree.get(field).getMetadata("hidden"), field);
         }
+        assertNotNull(tree.get("heldFilters", "heldClickEnabled"));
     }
     @Test void everyVisibleControlHasANameAndDescriptionAndAccordionsRender() {
         Tree tree = tree(new OrvenConfig());
@@ -84,7 +85,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(5, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(6, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -134,9 +135,42 @@ class ConfigLayoutTest {
         tree.getProp("spamWeapons", "spamWeaponOnly").setAs(false);
         assertEquals(Property.Display.HIDDEN, tree.getProp("spamWeapons", "spamItems").getDisplay());
         assertEquals(Property.Display.SHOWN, tree.getProp("spamWeapons", "spamAllowFist").getDisplay());
-        tree.getProp("heldClickEnabled").setAs(true);
+        tree.getProp("heldFilters", "heldClickEnabled").setAs(true);
         assertEquals(Property.Display.SHOWN, tree.getProp("heldWeapons", "heldClickAllowFist").getDisplay());
-        tree.getProp("heldClickLeft").setAs(false);
+        tree.getProp("heldFilters", "heldClickLeft").setAs(false);
         assertEquals(Property.Display.HIDDEN, tree.getProp("heldWeapons", "heldClickAllowFist").getDisplay());
+    }
+    @Test void mouseHoldAccordionKeepsItsMasterAndHidesEveryConditionWhenDisabledAgain() {
+        Tree tree = tree(new OrvenConfig());
+        var node = SettingIndexKt.buildAccordionNode((Tree) tree.get("heldFilters"));
+        assertEquals("heldClickEnabled", node.getHead().getID());
+        tree.getProp("heldFilters", "heldClickEnabled").setAs(true);
+        for (Property<?> property : node.getBody()) assertEquals(Property.Display.SHOWN, property.getDisplay(), property.getID());
+        tree.getProp("heldFilters", "heldClickEnabled").setAs(false);
+        for (Property<?> property : node.getBody()) assertEquals(Property.Display.HIDDEN, property.getDisplay(), property.getID());
+        assertEquals(Property.Display.SHOWN, node.getHead().getDisplay());
+    }
+    @Test void physicalFistAndAutoToolControlsHaveIndependentDefaultsAndDependencies() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        assertFalse(config.assistAllowFist); assertFalse(config.autoToolEnabled);
+        assertTrue(config.autoToolWhitelistEnabled); assertFalse(config.autoToolSwitchBack);
+        assertEquals(160, config.autoToolSwitchDelayMs); assertEquals(40, config.autoToolVariationMs);
+        assertNotNull(getClass().getClassLoader().getResource("assets/orvenbw/icons/autotool.svg"));
+        tree.getProp("enabled").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("assistWeapons", "assistAllowFist").getDisplay());
+        tree.getProp("leftClick").setAs(false);
+        assertEquals(Property.Display.HIDDEN, tree.getProp("assistWeapons", "assistAllowFist").getDisplay());
+        tree.getProp("autoToolEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("autoToolAllowedBlocks", "autoToolWhitelist").getDisplay());
+        assertEquals(Property.Display.HIDDEN, tree.getProp("autoToolSwap", "autoToolOverrideSwitchBack").getDisplay());
+        tree.getProp("autoToolSwap", "autoToolSwitchBack").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("autoToolSwap", "autoToolOverrideSwitchBack").getDisplay());
+        tree.getProp("autoToolEnabled").setAs(false);
+        for (Node section : tree.map.values()) {
+            if (!"AutoTool".equals(section.getMetadata("category")) || !(section instanceof Tree nested)) continue;
+            for (Node child : nested.map.values()) assertEquals(Property.Display.HIDDEN, ((Property<?>) child).getDisplay(), child.getID());
+        }
+        config.configSchema = 5; config.hitEffectDurationMs = 500;
+        assertTrue(config.migrateValues()); assertEquals(350, config.hitEffectDurationMs);
     }
 }

@@ -48,4 +48,23 @@ class HitTrackerTest {
         assertEquals(1, tracker.combo()); assertEquals(6, tracker.damage());
         assertFalse(tracker.observe(13, 150*MS, RESET));
     }
+    @Test void hurtStartsFeedbackBeforeHealthMetadataAndDoesNotCountTheSameHitTwice() {
+        var tracker = new HitTracker(); var target = new Object();
+        tracker.attack(target, 20, true, 0, RESET);
+        assertTrue(tracker.hurt(target, 60 * MS, RESET));
+        assertEquals(1, tracker.combo()); assertTrue(Double.isNaN(tracker.damage()));
+        assertFalse(tracker.hurt(target, 70 * MS, RESET));
+        assertFalse(tracker.observe(18, 300 * MS, RESET));
+        assertEquals(2, tracker.damage()); assertEquals(1, tracker.combo());
+        assertEquals(60 * MS, tracker.lastHit(), "Damage metadata must not restart the animation");
+    }
+    @Test void healthFirstAndUnrelatedOrExpiredHurtEventsDoNotInflateCombo() {
+        var tracker = new HitTracker(); var target = new Object();
+        tracker.attack(target, 20, false, 0, RESET);
+        assertFalse(tracker.hurt(new Object(), 50 * MS, RESET));
+        assertTrue(tracker.observe(18, 60 * MS, RESET));
+        tracker.attack(target, 18, false, 70 * MS, RESET);
+        assertFalse(tracker.hurt(target, 80 * MS, RESET)); assertEquals(1, tracker.combo());
+        assertFalse(tracker.hurt(target, 900 * MS, RESET));
+    }
 }

@@ -17,6 +17,7 @@ public final class OrvenBw implements ClientModInitializer {
     private OrvenConfig config;
     private ClickAssistFeature clickAssist;
     private HitEffectsFeature hitEffects;
+    private io.github.liwwyy.orvenbw.feature.autotool.AutoToolFeature autoTool;
     private io.github.liwwyy.orvenbw.debug.ClickDebugLog debugLog;
     private io.github.liwwyy.orvenbw.debug.ClickOriginTracker clickOrigins;
 
@@ -33,6 +34,8 @@ public final class OrvenBw implements ClientModInitializer {
         features.register(clickAssist);
         hitEffects = new HitEffectsFeature(config);
         features.register(hitEffects);
+        autoTool = new io.github.liwwyy.orvenbw.feature.autotool.AutoToolFeature(config);
+        features.register(autoTool);
         org.polyfrost.oneconfig.api.config.v1.ConfigManager.addProfileChangeListener(name -> { features.reset(); config.migrate(); });
         instance = this;
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.settingsBind);
@@ -52,4 +55,5 @@ public final class OrvenBw implements ClientModInitializer {
     public OrvenConfig config() { return config; }
     public HitEffectsFeature hitEffects() { return hitEffects; }
     public ClickAssistFeature clickAssist() { return clickAssist; }
+    public io.github.liwwyy.orvenbw.feature.autotool.AutoToolFeature autoTool() { return autoTool; }
 }

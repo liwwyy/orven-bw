@@ -9,7 +9,10 @@
     "ConnectionDebugMixin",
     "HitEffectsMixin",
     "HitEffectsRenderMixin",
-    "MouseDebugMixin"
+    "MouseDebugMixin",
+    "AutoToolInputMixin",
+    "InteractionManagerAccessor",
+    "HitEffectsStatusMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -167,7 +167,7 @@ public final class ClickAssistFeature implements ClientFeature {
         if (button == 0) {
             if (!spam && !config.leftClick) return false;
             if (spam ? !ItemAllowlist.allowsHand(held, config.spamItems, config.spamWeaponOnly, config.spamAllowFist)
-                    : config.weaponOnly && !allowedWeapon(held, false)) return false;
+                    : !ItemAllowlist.allowsHand(held, config.assistItems, config.weaponOnly, config.assistAllowFist)) return false;
             if ((spam ? config.spamOnlyWhileTargeting : config.onlyWhileTargeting) && (mc.crosshairTarget == null || mc.crosshairTarget.entity == null)) return false;
             return allowsBlock(spam ? config.spamClickThroughBlocks : !config.preserveMining,
                     mc.crosshairTarget != null && mc.crosshairTarget.type == HitResult.Type.BLOCK);
@@ -176,10 +176,6 @@ public final class ClickAssistFeature implements ClientFeature {
     }
     public static boolean allowsBlock(boolean throughBlocks, boolean targetingBlock) {
         return throughBlocks || !targetingBlock;
-    }
-
-    private boolean allowedWeapon(Item item, boolean spam) {
-        return ItemAllowlist.allows(item, spam ? config.spamItems : config.assistItems);
     }
 
     private static boolean entityTarget(Minecraft mc) {

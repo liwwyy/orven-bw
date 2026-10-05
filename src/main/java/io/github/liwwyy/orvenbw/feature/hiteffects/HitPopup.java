@@ -2,13 +2,13 @@ package io.github.liwwyy.orvenbw.feature.hiteffects;
 
 import java.util.Locale;
 
-/** One confirmed health decrease, with a stable direction and vibration phase. */
+/** A confirmed hit; damage may arrive after the initial hurt notification. */
 record HitPopup(long at, int combo, double damage, boolean critical, int criticalStreak,
                 int direction, double phase) {
     String text() {
         String label = critical ? " CRIT" + (criticalStreak > 1 ? " x" + criticalStreak : "")
                 : damage < 1.0 ? " WEAK" : "";
-        return combo + (combo == 1 ? " hit" : " hits") + " -" + number(damage) + label;
+        return combo + (combo == 1 ? " hit" : " hits") + (Double.isFinite(damage) ? " -" + number(damage) : "") + label;
     }
 
     int color() {
@@ -19,7 +19,7 @@ record HitPopup(long at, int combo, double damage, boolean critical, int critica
 
     double x(long now, long duration) {
         double progress = progress(now, duration);
-        double flight = Math.min(1, progress / .55);
+        double flight = Math.min(1, progress / .4);
         double shake = progress >= .28 && progress <= .85
                 ? Math.sin(progress * 65 + phase) * 1.7 * Math.sin(Math.PI * (progress - .28) / .57) : 0;
         return direction * (36 * (1 - Math.pow(1 - flight, 3)) + shake);
@@ -34,7 +34,17 @@ record HitPopup(long at, int combo, double damage, boolean critical, int critica
 
     int alpha(long now, long duration) {
         double progress = progress(now, duration);
-        return progress < .7 ? 255 : (int) Math.round(255 * (1 - progress) / .3);
+        if (progress < .12) return (int) Math.round(96 + 159 * progress / .12);
+        return progress < .4 ? 255 : (int) Math.round(255 * (1 - progress) / .6);
+    }
+
+    double scale(long now, long duration) {
+        double p = progress(now, duration);
+        if (p < .18) return .72 + .5 * (1 - Math.pow(1 - p / .18, 3));
+        return p < .4 ? 1.22 - .22 * (p - .18) / .22 : 1;
+    }
+    HitPopup withDamage(double amount) {
+        return new HitPopup(at, combo, amount, critical, criticalStreak, direction, phase);
     }
 
     private double progress(long now, long duration) {

@@ -9,7 +9,7 @@ import org.polyfrost.oneconfig.internal.legacy.InputConstants;
 import org.polyfrost.oneconfig.internal.ui.navigation.graph.ModConfigRoute;
 import io.github.liwwyy.orvenbw.feature.clickassist.ClickProfileSession;
 
-/** A native two-page layout with shared timing and hidden persisted-field aliases. */
+/** Feature pages with native accordions and hidden persisted-field aliases. */
 public final class OrvenConfig extends Config {
     @Include public boolean modEnabled = false;
     @Include public OneConfigKeybind settingsBind = KeybindHelper.builder().key(InputConstants.KEY_P).action((java.util.function.Consumer<Boolean>) down -> { if (down) openSettings(); }).build();
@@ -21,6 +21,7 @@ public final class OrvenConfig extends Config {
     @Include public boolean disableInCreative = true;
     @Include public boolean leftClick = true;
     @Include public boolean weaponOnly = true;
+    @Include public boolean assistAllowFist = false;
     @Include public boolean onlyWhileTargeting = false;
     @Include public boolean preserveMining = false;
     @Include public boolean rightClick = false;
@@ -122,7 +123,8 @@ public final class OrvenConfig extends Config {
     @Include public boolean hitEffectsShowHealth = true;
     @Include public boolean hitEffectsIgnoreNpcs = true;
     @Include public int hitComboResetMs = 1500;
-    @Include public int hitEffectDurationMs = 500;
+    @Include public int hitEffectDurationMs = 350;
+    @Include public int hitPopupPosition = 0;
     @Include public int hitEffectOffsetY = 18;
 
     @Include public boolean heldCrouchCancel = true;
@@ -134,6 +136,23 @@ public final class OrvenConfig extends Config {
     public String[] spamItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
     @ItemList(title = "Allowed items", description = "Items that enable mouse-hold clicking. Selecting any sword enables every sword; other items match exactly.", category = "ClickAssist", subcategory = "Advanced")
     public String[] heldItems = {"minecraft:diamond_sword", "minecraft:stick", "minecraft:beef"};
+    @Include public boolean autoToolEnabled = false;
+    @Include public int autoToolSwitchDelayMs = 160;
+    @Include public int autoToolVariationMs = 40;
+    @Include public int autoToolHoverDelayMs = 0;
+    @Include public boolean autoToolOnlyCrouching = false;
+    @Include public boolean autoToolRequireLeftMouse = true;
+    @Include public boolean autoToolSwitchBack = false;
+    @Include public boolean autoToolOverrideSwitchBack = true;
+    @Include public boolean autoToolIgnoreHeldItems = false;
+    @Include public boolean autoToolWhitelistEnabled = true;
+    @Include public boolean autoToolBlacklistEnabled = false;
+    @ItemList(title = "Ignored held items", description = "Pause AutoTool while holding any item in this list. Items match exactly.", category = "AutoTool", subcategory = "Filters")
+    public String[] autoToolIgnoredItems = {};
+    @ItemList(title = "Allowed blocks", description = "Select block items. One wool, glass or hardened-clay entry includes every color; one wooden block includes the wood family. Non-block items are ignored.", category = "AutoTool", subcategory = "Filters")
+    public String[] autoToolWhitelist = {"minecraft:wool", "minecraft:sandstone", "minecraft:glass", "minecraft:ladder", "minecraft:planks", "minecraft:log", "minecraft:obsidian", "minecraft:hardened_clay"};
+    @ItemList(title = "Blocked blocks", description = "Never switch for these block families, even if allowed above. Uses the same color and wood grouping as the whitelist.", category = "AutoTool", subcategory = "Filters")
+    public String[] autoToolBlacklist = {};
     @Button(title = "Clear debug cache", text = "Clear click log", description = "Erase the existing click-debug.jsonl file. Debugging continues in the same file when enabled.", category = "ClickAssist", subcategory = "Advanced")
     public void clearDebugCache() {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
@@ -148,6 +167,8 @@ public final class OrvenConfig extends Config {
     public String advancedInfo = "";
     @Button(title = "ClickAssist", text = "Open ClickAssist", icon = "assets/orvenbw/icons/clickassist.svg", description = "Open physical CPS boost, spam click button, mouse button hold click, hit effects and shared timing settings.")
     public void openClickAssist() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "ClickAssist")); }
+    @Button(title = "AutoTool", text = "Open AutoTool", icon = "assets/orvenbw/icons/autotool.svg", description = "Choose the best hotbar tool for mining, with switch timing, block filters and optional switch-back.")
+    public void openAutoTool() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "AutoTool")); }
     @Button(title = "Customize CPS HUD", text = "Open HUD editor", description = "Edit placement, colors, font, the CPS suffix and the dominant-side calculation.", category = "ClickAssist", subcategory = "HUD")
     public void editHud() { org.polyfrost.oneconfig.api.hud.v1.HudManager.INSTANCE.openEditor(); }
 
@@ -188,6 +209,7 @@ public final class OrvenConfig extends Config {
         option(collected, "heldClickWeaponOnly", "Require allowed item", "Run mouse-hold clicking only with an item from its Advanced item list. Any selected sword enables all swords.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickAllowFist", "Allow fist", "Allow left mouse-hold clicking with an empty hand. Off by default, including when the allowed-item filter is off.", Visualizer.SwitchVisualizer.class);
         option(collected, "weaponOnly", "Physical assist: allowed items only", "Restrict left physical assistance to items in the editable list below.", Visualizer.SwitchVisualizer.class);
+        option(collected, "assistAllowFist", "Allow fist", "Allow left physical CPS boosts with an empty hand. Off by default; independent of the allowed-item filter.", Visualizer.SwitchVisualizer.class);
         option(collected, "spamWeaponOnly", "Keybind spam: allowed items only", "Restrict left activation-keybind spam to items in the editable list below.", Visualizer.SwitchVisualizer.class);
         option(collected, "spamAllowFist", "Allow fist", "Allow left spam-key clicking with an empty hand. On by default, including when the allowed-item filter is on.", Visualizer.SwitchVisualizer.class);
         option(collected, "boostDelayMs", "Physical first-boost delay (ms)", "Wait this long before the first generated physical-assist click. Does not delay activation-keybind or mouse-hold spam.", Visualizer.SliderVisualizer.class);
@@ -205,8 +227,10 @@ public final class OrvenConfig extends Config {
         option(collected, "hitEffectsIgnoreNpcs", "Ignore players outside the tab list", "Hide health and hit popups for entities whose player name is absent from the tab list. Enabled by default; also excludes non-player mobs.", Visualizer.SwitchVisualizer.class);
         option(collected, "hitComboResetMs", "Combo reset delay (ms)", "Reset the registered-hit combo after this long without an observed hit, or when attacking a different target.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitComboResetMs", 500.0f, 5000.0f, 100.0f);
-        option(collected, "hitEffectDurationMs", "Floating text duration (ms)", "Time for each confirmed hit to fly left or right, briefly vibrate, and fade. Defaults to 500 ms.", Visualizer.SliderVisualizer.class);
-        slider(collected, "hitEffectDurationMs", 300.0f, 3000.0f, 100.0f);
+        option(collected, "hitEffectDurationMs", "Floating text duration (ms)", "Time for each confirmed hit to pop, fly sideways, vibrate and fade. Default: 350 ms.", Visualizer.SliderVisualizer.class);
+        slider(collected, "hitEffectDurationMs", 150.0f, 1500.0f, 10.0f);
+        option(collected, "hitPopupPosition", "Popup position", "Show floating hit text above the crosshair or beneath the health indicator. The lower position remains available when health is hidden.", Visualizer.RadioVisualizer.class);
+        collected.get("hitPopupPosition").addMetadata("options", new String[]{"Above crosshair", "Below heart"});
         option(collected, "hitEffectOffsetY", "Text vertical offset", "Distance below the crosshair for health and floating hit text, in scaled screen pixels.", Visualizer.SliderVisualizer.class);
         slider(collected, "hitEffectOffsetY", 0.0f, 100.0f, 1.0f);
         option(collected, "heldCrouchCancel", "Crouch cancel", "Cancel mouse-hold clicking while your sneak binding is held or your player is crouching. Release crouch to restart its activation timer.", Visualizer.SwitchVisualizer.class);
@@ -214,7 +238,7 @@ public final class OrvenConfig extends Config {
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
         Tree root = Tree.tree("orven-bw.json");
-        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "globalKeysInfo");
+        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "openAutoTool", "globalKeysInfo");
         section(root, collected, "globalKeys", "Keybinds", "General", "General", null, "settingsBind", "toggleModBind");
         leaves(root, collected, "General", "General", "conditionsInfo", "scoreboardOnly", "scoreboardWord");
         leaves(root, collected, "ClickAssist", "Physical CPS Boost", "enabled", "leftClick", "rightClick");
@@ -223,30 +247,30 @@ public final class OrvenConfig extends Config {
         leaves(root, collected, "ClickAssist", "Spam click button", "spamEnabled", "spamLeftBind", "spamRightBind", "spamMode");
         section(root, collected, "spamFilters", "Filters", "ClickAssist", "Spam click button", null,
                 "spamClickThroughBlocks", "spamBlocksOnly", "spamRequiresPlayer", "spamDisableInCreative", "spamOnlyWhileTargeting");
-        leaves(root, collected, "ClickAssist", "Mouse button hold click", "heldClickEnabled", "heldClickLeft", "heldClickRight");
-        section(root, collected, "heldFilters", "Conditions", "ClickAssist", "Mouse button hold click", null,
-                "heldClickDelayMs", "heldClickInstant", "heldClickRequiresPlayer", "heldClickEntityOnly", "heldCrouchCancel");
+        section(root, collected, "heldFilters", "Mouse button hold click", "ClickAssist", "Mouse button hold click", "heldClickEnabled",
+                "heldClickLeft", "heldClickRight", "heldClickDelayMs", "heldClickInstant", "heldClickRequiresPlayer", "heldClickEntityOnly", "heldCrouchCancel");
         section(root, collected, "hold", "Button Hold", "ClickAssist", "Button Hold", "holdEnabled", "holdLeftBind", "holdRightBind");
         leaves(root, collected, "ClickAssist", "Hit effects", "hitEffectsEnabled");
         section(root, collected, "hitFilters", "Display", "ClickAssist", "Hit effects", null,
                 "hitEffectsShowHealth", "hitEffectsIgnoreNpcs");
         section(root, collected, "hitOptions", "Animation", "ClickAssist", "Hit effects", null,
-                "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY");
+                "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY", "hitPopupPosition");
         leaves(root, collected, "ClickAssist", "Advanced", "advancedInfo");
         section(root, collected, "behavior", "Clicking behavior", "ClickAssist", "Advanced", null,
                 "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs");
-        section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems");
+        section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems", "assistAllowFist");
         section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems", "spamAllowFist");
         section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems", "heldClickAllowFist");
         section(root, collected, "debug", "Debugging", "ClickAssist", "Advanced", "debugEnabled", "clearDebugCache");
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
+        buildAutoTool(root, collected);
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
         depends(collected, "spamWeaponOnly", "spamItems");
         depends(collected, "heldClickWeaponOnly", "heldItems");
         depends(collected, "enabled", "leftClick", "rightClick", "activationCps", "requiresPlayer", "disableInCreative",
-                "onlyWhileTargeting", "preserveMining", "blocksOnly", "weaponOnly", "assistItems", "boostDelayMs");
-        depends(collected, "leftClick", "weaponOnly", "assistItems", "onlyWhileTargeting", "preserveMining");
+                "onlyWhileTargeting", "preserveMining", "blocksOnly", "weaponOnly", "assistItems", "assistAllowFist", "boostDelayMs");
+        depends(collected, "leftClick", "weaponOnly", "assistItems", "assistAllowFist", "onlyWhileTargeting", "preserveMining");
         depends(collected, "rightClick", "blocksOnly");
         depends(collected, "spamEnabled", "spamLeftBind", "spamRightBind", "spamMode", "spamClickThroughBlocks",
                 "spamBlocksOnly", "spamRequiresPlayer", "spamDisableInCreative", "spamOnlyWhileTargeting",
@@ -256,7 +280,7 @@ public final class OrvenConfig extends Config {
         depends(collected, "heldClickLeft", "heldClickAllowFist");
         depends(collected, "holdEnabled", "holdLeftBind", "holdRightBind");
         depends(collected, "hitEffectsEnabled", "hitEffectsShowHealth", "hitEffectsIgnoreNpcs", "hitComboResetMs",
-                "hitEffectDurationMs", "hitEffectOffsetY");
+                "hitEffectDurationMs", "hitEffectOffsetY", "hitPopupPosition");
         // Flat field aliases retain settings saved by every earlier layout.
         for (var field : getClass().getFields()) {
             if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || root.map.containsKey(field.getName())) continue;
@@ -265,6 +289,34 @@ public final class OrvenConfig extends Config {
             root.put(alias);
         }
         return root;
+    }
+    private static void buildAutoTool(Tree root, Tree collected) {
+        option(collected, "autoToolEnabled", "Enable AutoTool", "Select the best mining tool from your hotbar for the block under the crosshair. Requires the global mod switch and conditions.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolSwitchDelayMs", "Switch delay (ms)", "Wait before selecting a new tool. Each switch samples the variation below. Default: 160 ms.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoToolSwitchDelayMs", 0, 1000, 10);
+        option(collected, "autoToolVariationMs", "Switch variation (±ms)", "Randomly add or subtract up to this duration for each switch; sampled once, never every tick. Default: ±40 ms.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoToolVariationMs", 0, 500, 10);
+        option(collected, "autoToolHoverDelayMs", "Hover delay (ms)", "Also require the crosshair to remain on the same block this long. Runs alongside switch delay, not after it.", Visualizer.SliderVisualizer.class);
+        slider(collected, "autoToolHoverDelayMs", 0, 1000, 10);
+        option(collected, "autoToolOnlyCrouching", "Only while crouching", "Allow tool switching only while your player is crouched.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolRequireLeftMouse", "Require left mouse", "Switch only while physically holding the left mouse button. Turn off to select a tool just by aiming at a block.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolSwitchBack", "Switch back when done", "Restore the previous slot after releasing the mouse, looking away, or no longer meeting the conditions. Off by default.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolOverrideSwitchBack", "Override switch-back slot", "While AutoTool owns the slot, number keys and scrolling update the slot to restore when done instead of interrupting mining.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolIgnoreHeldItems", "Held item blacklist", "Pause switching while holding an item selected below. Pauses during right-click item use regardless of this setting.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolWhitelistEnabled", "Block whitelist", "Switch tools only for the selected block families. Starts with wool, sandstone, glass, ladders, wood, obsidian and hardened clay.", Visualizer.SwitchVisualizer.class);
+        option(collected, "autoToolBlacklistEnabled", "Block blacklist", "Prevent tool switching for the selected block families. The blacklist takes priority over the whitelist.", Visualizer.SwitchVisualizer.class);
+        leaves(root, collected, "AutoTool", "General", "autoToolEnabled");
+        section(root, collected, "autoToolConditions", "Conditions", "AutoTool", "General", null, "autoToolOnlyCrouching", "autoToolRequireLeftMouse");
+        section(root, collected, "autoToolTiming", "Timing", "AutoTool", "General", null, "autoToolSwitchDelayMs", "autoToolVariationMs", "autoToolHoverDelayMs");
+        section(root, collected, "autoToolSwap", "Switch-back", "AutoTool", "General", null, "autoToolSwitchBack", "autoToolOverrideSwitchBack");
+        section(root, collected, "autoToolHeldItems", "Held item blacklist", "AutoTool", "Filters", "autoToolIgnoreHeldItems", "autoToolIgnoredItems");
+        section(root, collected, "autoToolAllowedBlocks", "Block whitelist", "AutoTool", "Filters", "autoToolWhitelistEnabled", "autoToolWhitelist");
+        section(root, collected, "autoToolBlockedBlocks", "Block blacklist", "AutoTool", "Filters", "autoToolBlacklistEnabled", "autoToolBlacklist");
+        depends(collected, "autoToolEnabled", "autoToolOnlyCrouching", "autoToolRequireLeftMouse", "autoToolSwitchDelayMs", "autoToolVariationMs", "autoToolHoverDelayMs", "autoToolSwitchBack", "autoToolOverrideSwitchBack", "autoToolIgnoreHeldItems", "autoToolIgnoredItems", "autoToolWhitelistEnabled", "autoToolWhitelist", "autoToolBlacklistEnabled", "autoToolBlacklist");
+        depends(collected, "autoToolSwitchBack", "autoToolOverrideSwitchBack");
+        depends(collected, "autoToolIgnoreHeldItems", "autoToolIgnoredItems");
+        depends(collected, "autoToolWhitelistEnabled", "autoToolWhitelist");
+        depends(collected, "autoToolBlacklistEnabled", "autoToolBlacklist");
     }
     private static void option(Tree tree, String id, String title, String description, Class<?> visualizer) {
         Node node = tree.get(id);
@@ -310,8 +362,12 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 5) return false;
-        if (configSchema == 4) { migrateItems(); configSchema = 5; return true; }
+        if (configSchema >= 6) return false;
+        if (configSchema == 5) {
+            if (hitEffectDurationMs == 500) hitEffectDurationMs = 350;
+            configSchema = 6; return true;
+        }
+        if (configSchema == 4) { migrateItems(); configSchema = 5; migrateValues(); return true; }
         if (configSchema < 2) {
             assistRampEnabled = spamRampEnabled = rampEnabled;
             assistRampMs = spamRampMs = rampMs == 1200 ? 1000 : rampMs;
@@ -349,6 +405,7 @@ public final class OrvenConfig extends Config {
         if (spamButton == 1) { spamLeftBind.setKeyCodes(new int[0]); spamLeftBind.setMouseBtns(new int[0]); }
         migrateItems();
         configSchema = 5;
+        migrateValues();
         return true;
     }
     private void migrateItems() {

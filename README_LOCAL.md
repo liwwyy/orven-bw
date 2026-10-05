@@ -5,13 +5,13 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.5.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.6.0+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
 Press **P** to open General. New profiles start with the mod **off**; existing profiles
 retain their saved enabled state. General comes first and ClickAssist comes second.
-The icon-bearing ClickAssist button in General opens that page directly.
+AutoTool comes third. The icon-bearing shortcut buttons in General open each feature page.
 
 General includes the mod switch, a collapsed **Global Keybinds** menu for opening
 settings and toggling the whole mod, and **Conditions** with optional scoreboard
@@ -29,7 +29,8 @@ ClickAssist is arranged in this order:
 - **Spam click button:** visible enable, separate left/right activation binds, and
   Hold/Toggle mode. Left defaults to middle mouse; right is unassigned. Filters are
   separate from mouse-hold conditions. Both sides can run independently.
-- **Mouse button hold click:** visible independent enable and left/right switches.
+- **Mouse button hold click:** an embedded enable switch with left/right controls and
+  conditions inside the same accordion. Disabling it hides every dependent control.
   Left defaults on, right off. Conditions require an entity target and a living player
   within four blocks, and Advanced requires a listed item by default. Crouch cancel is on by default; holding
   your sneak binding or crouching cancels this mode and restarts the eligible timer. The 250-ms timer
@@ -42,9 +43,12 @@ ClickAssist is arranged in this order:
 - **Hit effects:** shows `❤ 10/10` in red under the crosshair, with a separate health
   toggle. The NPC filter is enabled by default: targets absent from the server tab list
   have no health display or hit popup. Confirmed hits fly randomly left or right from
-  the crosshair, briefly vibrate, and fade in 500 ms by default. Weak hits below one
+  the crosshair, pop in, briefly vibrate, and fade in 350 ms by default. Weak hits below one
   health point show WEAK; critical hits show CRIT, including a consecutive critical
-  count. Customize combo reset, animation duration and vertical offset.
+  count. Choose above-crosshair or below-heart popups. A correlated server hurt event
+  starts feedback before delayed health metadata; the damage number fills in when
+  observed, without adding another hit or restarting the animation. Health is checked
+  every render frame. Network latency and ambiguous multiplayer damage still limit attribution.
 - **Advanced:** shared fitted clicking behavior and the first-boost delay, plus
   native editable item lists for each clicking mode, then Debugging at the bottom.
   Groups start collapsed.
@@ -52,13 +56,15 @@ ClickAssist is arranged in this order:
 
 Weapon filters apply to physical/activation-key **left** clicks; their right block-only
 filters remain separate. Mouse-hold item filtering applies to both selected sides.
-Advanced has separate **Allow fist** switches for left spam-key clicking (on by default)
-and left mouse-hold clicking (off by default). An empty hand needs its switch even when
+Advanced has separate **Allow fist** switches for left physical boosting (off by default),
+left spam-key clicking (on by default), and left mouse-hold clicking (off by default).
+An empty hand needs its switch even when
 the corresponding allowed-item filter is off; right-click conditions are unchanged.
 Each filter uses OneConfig’s native item picker: add or remove custom items directly.
 Defaults include a sword, stick and raw beef (`minecraft:beef`). Choosing any sword
 enables all swords; other items match exactly. Existing weapon selections migrate to
 item lists once, with raw beef added.
+
 Right generated clicks pause during blocking, eating and charging to preserve vanilla
 item use. Activation-key spam takes priority over mouse-hold spam on the same side;
 physical assistance runs when neither spam trigger is active. One scheduler runs per side.
@@ -68,6 +74,32 @@ server tab list. It compares profile usernames ignoring case, not decorated disp
 names. Missing network/tab information fails the check. NPCs placed in the tab list can
 still qualify under this deliberately narrow rule.
 
+## AutoTool
+
+The AutoTool page follows the same collapsed-group layout. AutoTool starts disabled
+and obeys the General mod switch and scoreboard condition. It selects the best tool
+from the nine hotbar slots for the block under the crosshair, using Raven-bS's mining
+speed, Efficiency enchantment, harvest penalty and durability tie-break rules.
+It performs a normal visible slot change and synchronizes the selected slot through
+Minecraft's interaction manager. There is no item spoofing.
+
+- **Timing:** 160-ms switch delay with a fresh ±40-ms sample per requested switch,
+  plus a separate hover delay (zero by default). The waits overlap. Moving to a new
+  block or tool restarts the switch delay; releasing the required mouse button cancels it.
+- **Conditions:** require physical left mouse (on by default) and only while crouching
+  (off by default). GUI, death, spectator/adventure restrictions, focus loss and item
+  use pause switching.
+- **Switch-back:** restore the original slot when finished (off by default). With
+  switch-back enabled, Override switch-back lets scrolling or number keys choose the
+  eventual return slot while AutoTool keeps the mining tool selected. External slot
+  changes and world/player changes are respected and never restored over.
+- **Filters:** optional held-item blacklist, block whitelist and block blacklist use
+  editable OneConfig item pickers. Select block items for block lists; non-block
+  entries are ignored. The blacklist wins. The whitelist is on by default with wool,
+  sandstone, glass, ladders, planks/logs, obsidian and hardened clay. Legacy colors
+  match automatically; normal/stained glass and normal/stained hardened clay share
+  families. Selecting any wooden block includes all wood-material blocks except ladders,
+  which have their own entry. This includes all plank and log variants.
 ## Sample-fitted clicking profiles (0.3.0)
 
 ClickAssist → Advanced → **Clicking behavior** replaces the old three-level bag,
@@ -216,7 +248,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current standard version is **0.5.0**. The
+release (patch for fixes, minor for features). The current main version is **0.6.0**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 

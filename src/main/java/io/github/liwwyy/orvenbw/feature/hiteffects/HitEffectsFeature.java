@@ -12,6 +12,7 @@ import net.minecraft.entity.living.effect.StatusEffect;
 import java.util.ArrayDeque;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
+import org.lwjgl.opengl.GL11;
 
 /** Reticle-relative health and floating combo text, inspired by the supplied hit_show fragment. */
 public final class HitEffectsFeature implements ClientFeature {
@@ -25,7 +26,8 @@ public final class HitEffectsFeature implements ClientFeature {
                 && mc.screen == null && mc.focused && !mc.isPaused() && mc.player.isAlive() && !mc.player.isSpectator();
     }
     public void attack(Minecraft mc, PlayerEntity player, Entity entity) {
-        if (!eligible(mc) || player != mc.player || !(entity instanceof LivingEntity living) || living == player) return;
+        if (!eligible(mc) || player != mc.player || !(entity instanceof LivingEntity living) || living == player
+                || config.hitEffectsIgnoreNpcs && !listedPlayer(mc, living)) return;
         if (target != living) popups.clear();
         target = living;
         boolean critical = player.fallDistance > 0 && !player.onGround && !player.isClimbing() && !player.isInWater()
@@ -36,7 +38,20 @@ public final class HitEffectsFeature implements ClientFeature {
     }
     @Override public void beforeInteractions(Minecraft mc) {
         if (!eligible(mc)) { reset(); return; }
-        if (target != null && tracker.observe(target.getHealth(), System.nanoTime(), config.hitComboResetMs * 1_000_000L)) addPopup();
+        observeHealth();
+    }
+    public void hurt(Minecraft mc, LivingEntity entity) {
+        if (!eligible(mc) || entity != target || config.hitEffectsIgnoreNpcs && !listedPlayer(mc, entity)) return;
+        observeHealth();
+        if (tracker.hurt(entity, System.nanoTime(), config.hitComboResetMs * 1_000_000L)) addPopup();
+    }
+    private void observeHealth() {
+        if (target == null) return;
+        if (tracker.observe(target.getHealth(), System.nanoTime(), config.hitComboResetMs * 1_000_000L)) addPopup();
+        else if (!popups.isEmpty() && popups.peekLast().at() == tracker.lastHit()
+                && Double.isFinite(tracker.damage()) && !Double.isFinite(popups.peekLast().damage())) {
+            HitPopup popup = popups.removeLast(); popups.addLast(popup.withDamage(tracker.damage()));
+        }
     }
     private void addPopup() {
         var random = ThreadLocalRandom.current();
@@ -46,9 +61,10 @@ public final class HitEffectsFeature implements ClientFeature {
     }
     public void render(Minecraft mc) {
         if (!eligible(mc) || mc.options.hideGui) return;
+        observeHealth(); // Check each frame instead of waiting for the next 50 ms interaction tick.
         long now = System.nanoTime();
         LivingEntity shown = mc.crosshairTarget != null && mc.crosshairTarget.entity instanceof LivingEntity living ? living : null;
-        long duration = Math.clamp(config.hitEffectDurationMs, 300, 3000) * 1_000_000L;
+        long duration = Math.clamp(config.hitEffectDurationMs, 150, 1500) * 1_000_000L;
         while (!popups.isEmpty() && now - popups.peekFirst().at() >= duration) popups.removeFirst();
         if (!popups.isEmpty()) shown = target;
         if (shown == null || shown == mc.player || config.hitEffectsIgnoreNpcs && !listedPlayer(mc, shown)) return;
@@ -63,8 +79,15 @@ public final class HitEffectsFeature implements ClientFeature {
             int alpha = popup.alpha(now, duration);
             if (alpha < 8) continue; // Vanilla interprets near-zero alpha as fully opaque.
             String hit = popup.text();
-            mc.textRenderer.drawWithShadow(hit, x - mc.textRenderer.getWidth(hit) / 2f + (float) popup.x(now, duration),
-                    y + (float) popup.y(now, duration), (alpha << 24) | popup.color());
+            float anchor = config.hitPopupPosition == 1 ? config.hitEffectOffsetY + 14 : -12;
+            float movement = (float) popup.y(now, duration) * (config.hitPopupPosition == 1 ? -1 : 1);
+            float scale = (float) popup.scale(now, duration);
+            GL11.glPushMatrix();
+            try {
+                GL11.glTranslatef(x + (float) popup.x(now, duration), y + anchor + movement, 0);
+                GL11.glScalef(scale, scale, 1);
+                mc.textRenderer.drawWithShadow(hit, -mc.textRenderer.getWidth(hit) / 2f, 0, (alpha << 24) | popup.color());
+            } finally { GL11.glPopMatrix(); }
         }
     }
     private static boolean listedPlayer(Minecraft mc, LivingEntity entity) {

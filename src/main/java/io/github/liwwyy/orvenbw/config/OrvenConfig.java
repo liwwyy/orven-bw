@@ -38,6 +38,7 @@ public final class OrvenConfig extends Config {
     @Include public int spamButton = 0;
     @Include public boolean spamClickThroughBlocks = true;
     @Include public boolean spamWeaponOnly = true;
+    @Include public boolean spamAllowFist = true;
     @Include public boolean spamBlocksOnly = true;
     @Include public boolean spamRequiresPlayer = false;
     @Include public boolean spamDisableInCreative = true;
@@ -49,6 +50,7 @@ public final class OrvenConfig extends Config {
     @Include public boolean heldClickInstant = false;
     @Include public boolean heldClickRequiresPlayer = true;
     @Include public boolean heldClickWeaponOnly = true;
+    @Include public boolean heldClickAllowFist = false;
     @Include public boolean heldClickEntityOnly = true;
     @Include public boolean spamSwords = true;
     @Include public boolean spamAxes = false;
@@ -151,7 +153,7 @@ public final class OrvenConfig extends Config {
 
     @Override protected Tree makeTree() {
         Tree collected = super.makeTree();
-        option(collected, "modEnabled", "Enable orven-bw:", "Allow enabled features to run while all global conditions are met. The settings key works while disabled.", Visualizer.SwitchVisualizer.class);
+        option(collected, "modEnabled", "Enable orven-bw", "Allow enabled features to run while all global conditions are met. The settings key works while disabled.", Visualizer.SwitchVisualizer.class);
         option(collected, "settingsBind", "Config open key", "Open the orven-bw General settings page. Default: P.", Visualizer.KeybindVisualizer.class);
         option(collected, "toggleModBind", "Enable/Disable toggle", "Turn the whole mod on or off. Disabling clears active clicking and held buttons.", Visualizer.KeybindVisualizer.class);
         option(collected, "scoreboardOnly", "Scoreboard filter", "Run features only when the sidebar title or a visible scoreboard line contains the matching text.", Visualizer.SwitchVisualizer.class);
@@ -184,8 +186,10 @@ public final class OrvenConfig extends Config {
         option(collected, "heldClickRequiresPlayer", "Require nearby player", "Require a living tab-listed player within four blocks. NPCs absent from the tab list do not count.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickEntityOnly", "Require an entity target", "Require an entity under the crosshair. Turn off to allow block and air targets.", Visualizer.SwitchVisualizer.class);
         option(collected, "heldClickWeaponOnly", "Require allowed item", "Run mouse-hold clicking only with an item from its Advanced item list. Any selected sword enables all swords.", Visualizer.SwitchVisualizer.class);
+        option(collected, "heldClickAllowFist", "Allow fist", "Allow left mouse-hold clicking with an empty hand. Off by default, including when the allowed-item filter is off.", Visualizer.SwitchVisualizer.class);
         option(collected, "weaponOnly", "Physical assist: allowed items only", "Restrict left physical assistance to items in the editable list below.", Visualizer.SwitchVisualizer.class);
         option(collected, "spamWeaponOnly", "Keybind spam: allowed items only", "Restrict left activation-keybind spam to items in the editable list below.", Visualizer.SwitchVisualizer.class);
+        option(collected, "spamAllowFist", "Allow fist", "Allow left spam-key clicking with an empty hand. On by default, including when the allowed-item filter is on.", Visualizer.SwitchVisualizer.class);
         option(collected, "boostDelayMs", "Physical first-boost delay (ms)", "Wait this long before the first generated physical-assist click. Does not delay activation-keybind or mouse-hold spam.", Visualizer.SliderVisualizer.class);
         slider(collected, "boostDelayMs", 0.0f, 150.0f, 5.0f);
         option(collected, "clickingProfile", "Clicking profile", "Humble follows the sampled bursts and dips. Performative narrows tempo swings around the sampled median. Both preserve paired-click rhythm.", Visualizer.RadioVisualizer.class);
@@ -232,14 +236,27 @@ public final class OrvenConfig extends Config {
         section(root, collected, "behavior", "Clicking behavior", "ClickAssist", "Advanced", null,
                 "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs");
         section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems");
-        section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems");
-        section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems");
+        section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems", "spamAllowFist");
+        section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems", "heldClickAllowFist");
         section(root, collected, "debug", "Debugging", "ClickAssist", "Advanced", "debugEnabled", "clearDebugCache");
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
         depends(collected, "spamWeaponOnly", "spamItems");
         depends(collected, "heldClickWeaponOnly", "heldItems");
+        depends(collected, "enabled", "leftClick", "rightClick", "activationCps", "requiresPlayer", "disableInCreative",
+                "onlyWhileTargeting", "preserveMining", "blocksOnly", "weaponOnly", "assistItems", "boostDelayMs");
+        depends(collected, "leftClick", "weaponOnly", "assistItems", "onlyWhileTargeting", "preserveMining");
+        depends(collected, "rightClick", "blocksOnly");
+        depends(collected, "spamEnabled", "spamLeftBind", "spamRightBind", "spamMode", "spamClickThroughBlocks",
+                "spamBlocksOnly", "spamRequiresPlayer", "spamDisableInCreative", "spamOnlyWhileTargeting",
+                "spamWeaponOnly", "spamItems", "spamAllowFist");
+        depends(collected, "heldClickEnabled", "heldClickLeft", "heldClickRight", "heldClickDelayMs", "heldClickInstant",
+                "heldClickRequiresPlayer", "heldClickEntityOnly", "heldCrouchCancel", "heldClickWeaponOnly", "heldItems", "heldClickAllowFist");
+        depends(collected, "heldClickLeft", "heldClickAllowFist");
+        depends(collected, "holdEnabled", "holdLeftBind", "holdRightBind");
+        depends(collected, "hitEffectsEnabled", "hitEffectsShowHealth", "hitEffectsIgnoreNpcs", "hitComboResetMs",
+                "hitEffectDurationMs", "hitEffectOffsetY");
         // Flat field aliases retain settings saved by every earlier layout.
         for (var field : getClass().getFields()) {
             if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || root.map.containsKey(field.getName())) continue;

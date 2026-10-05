@@ -12,7 +12,7 @@ class ConfigLayoutTest {
         var config = new OrvenConfig(); Tree tree = tree(config);
         assertFalse(config.modEnabled);
         assertEquals("modEnabled", tree.map.keySet().iterator().next());
-        assertEquals("Enable orven-bw:", tree.get("modEnabled").getTitle());
+        assertEquals("Enable orven-bw", tree.get("modEnabled").getTitle());
         assertNotNull(tree.get("modEnabled").getMetadata("visualizer"));
         assertNull(tree.get("modEnabled").getMetadata("hidden"));
         assertEquals("assets/orvenbw/icons/clickassist.svg", tree.get("openClickAssist").getMetadata("icon"));
@@ -119,5 +119,24 @@ class ConfigLayoutTest {
         assertFalse(java.util.Arrays.asList(config.assistItems).contains("minecraft:diamond_sword"));
         config.heldItems=new String[]{"minecraft:diamond"}; assertFalse(config.migrateValues());
         assertArrayEquals(new String[]{"minecraft:diamond"}, config.heldItems);
+    }
+    @Test void featureSubsettingsHideWithMastersAndFistDefaultsAreSeparate() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        assertTrue(config.spamAllowFist); assertFalse(config.heldClickAllowFist);
+        assertEquals(Property.Display.HIDDEN, tree.getProp("spamWeapons", "spamAllowFist").getDisplay());
+        assertEquals(Property.Display.HIDDEN, tree.getProp("spamWeapons", "spamItems").getDisplay());
+        assertEquals(Property.Display.HIDDEN, tree.getProp("heldWeapons", "heldClickAllowFist").getDisplay());
+        assertEquals(Property.Display.HIDDEN, tree.getProp("hitFilters", "hitEffectsShowHealth").getDisplay());
+        assertEquals(Property.Display.SHOWN, tree.getProp("debugEnabled").getDisplay());
+        tree.getProp("spamEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("spamWeapons", "spamAllowFist").getDisplay());
+        assertEquals(Property.Display.SHOWN, tree.getProp("spamWeapons", "spamItems").getDisplay());
+        tree.getProp("spamWeapons", "spamWeaponOnly").setAs(false);
+        assertEquals(Property.Display.HIDDEN, tree.getProp("spamWeapons", "spamItems").getDisplay());
+        assertEquals(Property.Display.SHOWN, tree.getProp("spamWeapons", "spamAllowFist").getDisplay());
+        tree.getProp("heldClickEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN, tree.getProp("heldWeapons", "heldClickAllowFist").getDisplay());
+        tree.getProp("heldClickLeft").setAs(false);
+        assertEquals(Property.Display.HIDDEN, tree.getProp("heldWeapons", "heldClickAllowFist").getDisplay());
     }
 }

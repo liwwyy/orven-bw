@@ -75,13 +75,21 @@ public final class ClickAssistFeature implements ClientFeature {
         if (!config.holdEnabled) held[0] = held[1] = false;
         long now = System.nanoTime();
         var conditions = heldConditions(mc);
-        boolean heldPermitted = conditions.allows(config.heldClickEntityOnly, config.heldClickWeaponOnly, config.heldClickRequiresPlayer);
+        ItemStack heldStack = mc.player.getItemInHand();
+        Item heldItem = heldStack == null ? null : heldStack.getItem();
         for (int button = 0; button <= 1; button++) {
+            boolean leftFist = button == 0 && heldItem == null && config.heldClickAllowFist;
+            var sideConditions = new HeldClickTrigger.Conditions(
+                    conditions.available() && (button != 0 || heldItem != null || leftFist),
+                    conditions.entity(), conditions.weapon() || leftFist, conditions.nearby());
+            boolean heldPermitted = sideConditions.allows(config.heldClickEntityOnly, config.heldClickWeaponOnly, config.heldClickRequiresPlayer);
             int code = button == 0 ? attackCode : useCode;
             if (held[button]) {
                 if (!ownsHold[button]) {
+                    var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
+                    if (mod != null && config.debugEnabled)
+                        mod.clickOrigins().prepare("artificial", "button_hold", null, System.nanoTime());
                     KeyBinding.click(code);
-                    debug("button_hold", button, "queue", code);
                     debug("button_hold", button, "hold_down", code);
                 }
                 KeyBinding.set(code, true);
@@ -97,7 +105,7 @@ public final class ClickAssistFeature implements ClientFeature {
                             && (button == 0 ? config.heldClickLeft : config.heldClickRight)
                             && heldPermitted,
                     config.heldClickDelayMs * 1_000_000L,
-                    config.heldClickInstant && conditions.instantReady());
+                    config.heldClickInstant && sideConditions.instantReady());
             int source = HeldClickTrigger.source(held[button], explicitSpam, heldSpam,
                     config.enabled && engine.manuallyActive(button, now, config.activationCps));
             boolean spamming = source == 1 || source == 2;
@@ -113,11 +121,12 @@ public final class ClickAssistFeature implements ClientFeature {
             final int side = button, clickSource = source;
             engine.pollDue(button, now, generated, clicking, spamming ? 0 : config.boostDelayMs * 1_000_000L,
                     profile.ceiling(), sessions[button]::intervalWeight, intended -> {
-                        KeyBinding.click(code);
                         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
-                        if (mod != null) mod.debugLog().generated(
-                                clickSource == 1 ? "spam_click" : clickSource == 2 ? "mouse_hold_click" : "cps_boost",
-                                side == 0 ? "left" : "right", code, profile.name(), intended, System.nanoTime());
+                        if (mod != null && config.debugEnabled)
+                            mod.clickOrigins().prepare("artificial",
+                                    clickSource == 1 ? "spam_click" : clickSource == 2 ? "mouse_hold_click" : "cps_boost",
+                                    profile.name(), intended);
+                        KeyBinding.click(code);
                         activeButton = side;
                     });
         }
@@ -157,7 +166,8 @@ public final class ClickAssistFeature implements ClientFeature {
         Item held = stack == null ? null : stack.getItem();
         if (button == 0) {
             if (!spam && !config.leftClick) return false;
-            if ((spam ? config.spamWeaponOnly : config.weaponOnly) && !allowedWeapon(held, spam)) return false;
+            if (spam ? !ItemAllowlist.allowsHand(held, config.spamItems, config.spamWeaponOnly, config.spamAllowFist)
+                    : config.weaponOnly && !allowedWeapon(held, false)) return false;
             if ((spam ? config.spamOnlyWhileTargeting : config.onlyWhileTargeting) && (mc.crosshairTarget == null || mc.crosshairTarget.entity == null)) return false;
             return allowsBlock(spam ? config.spamClickThroughBlocks : !config.preserveMining,
                     mc.crosshairTarget != null && mc.crosshairTarget.type == HitResult.Type.BLOCK);

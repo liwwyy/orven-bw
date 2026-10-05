@@ -23,5 +23,9 @@ class ItemAllowlistTest {
         assertFalse(ItemAllowlist.allows(beef, new String[]{"missing:item"}));
         assertFalse(ItemAllowlist.allows(null, ids));
         assertFalse(ItemAllowlist.allows(beef, new String[0]));
+        assertTrue(ItemAllowlist.allowsHand(null, ids, true, true));
+        assertFalse(ItemAllowlist.allowsHand(null, ids, false, false));
+        assertTrue(ItemAllowlist.allowsHand(stick, ids, false, false));
+        assertFalse(ItemAllowlist.allowsHand(stick, ids, true, true));
     }
 }

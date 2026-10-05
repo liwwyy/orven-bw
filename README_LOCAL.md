@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.4.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.5.0+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -17,6 +17,8 @@ General includes the mod switch, a collapsed **Global Keybinds** menu for openin
 settings and toggling the whole mod, and **Conditions** with optional scoreboard
 filtering. Matching text defaults to `Red`, ignores colors/case, and checks the sidebar
 title and visible lines. The settings key works while the mod is disabled.
+Feature switches stay visible while their dependent controls and feature-specific
+Advanced accordions hide when disabled. Shared timing and Debugging remain available.
 
 ClickAssist is arranged in this order:
 
@@ -50,6 +52,9 @@ ClickAssist is arranged in this order:
 
 Weapon filters apply to physical/activation-key **left** clicks; their right block-only
 filters remain separate. Mouse-hold item filtering applies to both selected sides.
+Advanced has separate **Allow fist** switches for left spam-key clicking (on by default)
+and left mouse-hold clicking (off by default). An empty hand needs its switch even when
+the corresponding allowed-item filter is off; right-click conditions are unchanged.
 Each filter uses OneConfig’s native item picker: add or remove custom items directly.
 Defaults include a sword, stick and raw beef (`minecraft:beef`). Choosing any sword
 enables all swords; other items match exactly. Existing weapon selections migrate to
@@ -99,6 +104,12 @@ The scheduler queues up to two genuinely due clicks per button per tick through 
 Physical boosting supplies only the shortfall below the modeled total rate. Button hold
 keeps its existing vanilla held-state behavior. Minecraft still processes input on ticks;
 modeled deadlines, actual queues, packets and registered hits are different measurements.
+With Debug mode on, the same JSONL log now records physical input, generated deadlines,
+binding queues, vanilla attack/use actions, and outgoing interaction submissions. Origin
+and action IDs connect these stages when attribution is possible; unmatched actions are
+labeled unknown. The local viewer lets you select each stage. Packet rows record client
+submission, not server receipt. This version collects comparable timing data before any
+scheduler changes; existing logs remain readable.
 
 Reproduce the fit from local samples (Python standard library only):
 
@@ -205,7 +216,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current standard version is **0.4.0**. The
+release (patch for fixes, minor for features). The current standard version is **0.5.0**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 

@@ -48,6 +48,9 @@ public final class ClickDebugLog implements AutoCloseable {
     }
     /** Intended model deadlines are distinct from actual queue times and native hardware timestamps. */
     public void generated(String method, String side, int keyCode, String profile, long intended, long queued) {
+        generated(method, side, keyCode, profile, intended, queued, 0);
+    }
+    public void generated(String method, String side, int keyCode, String profile, long intended, long queued, long originId) {
         if (!enabled.getAsBoolean() || closed.get()) return;
         JsonObject row = stamp("input", System.currentTimeMillis(), queued);
         row.addProperty("source", "artificial"); row.addProperty("method", method);
@@ -57,13 +60,39 @@ public final class ClickDebugLog implements AutoCloseable {
         row.addProperty("intended_elapsed_ns_text", Long.toString(intended - started));
         row.addProperty("queued_ns_text", Long.toString(queued));
         row.addProperty("dispatch_lateness_ns_text", Long.toString(Math.max(0, queued - intended)));
+        if (originId != 0) row.addProperty("origin_id", originId);
+        submit(() -> append(row));
+    }
+    public void queued(String source, String method, String side, int keyCode, long originId, long now) {
+        if (!enabled.getAsBoolean() || closed.get()) return;
+        JsonObject row = stamp("input", System.currentTimeMillis(), now);
+        row.addProperty("source", source); row.addProperty("method", method);
+        row.addProperty("side", side); row.addProperty("action", "queue"); row.addProperty("key_code", keyCode);
+        row.addProperty("origin_id", originId);
+        submit(() -> append(row));
+    }
+    public void action(String source, String method, String side, long originId, long actionId, long now) {
+        if (!enabled.getAsBoolean() || closed.get()) return;
+        JsonObject row = stamp("action", System.currentTimeMillis(), now);
+        row.addProperty("source", source); row.addProperty("method", method); row.addProperty("side", side);
+        row.addProperty("action", "invoke"); row.addProperty("origin_id", originId); row.addProperty("action_id", actionId);
+        submit(() -> append(row));
+    }
+    public void packet(String source, String method, String side, String packetKind,
+                       long originId, long actionId, long now) {
+        if (!enabled.getAsBoolean() || closed.get()) return;
+        JsonObject row = stamp("packet", System.currentTimeMillis(), now);
+        row.addProperty("source", source); row.addProperty("method", method); row.addProperty("side", side);
+        row.addProperty("action", "send"); row.addProperty("packet_kind", packetKind);
+        row.addProperty("origin_id", originId); row.addProperty("action_id", actionId);
         submit(() -> append(row));
     }
     private JsonObject stamp(String event, long millis, long nanos) {
         JsonObject row = new JsonObject();
         row.addProperty("schema", 1); row.addProperty("event", event); row.addProperty("session", session);
-        row.addProperty("sequence", event.equals("input") ? sequence.incrementAndGet() : 0);
+        row.addProperty("sequence", event.equals("session_start") ? 0 : sequence.incrementAndGet());
         row.addProperty("timestamp_ms", millis); row.addProperty("monotonic_ns", nanos);
+        row.addProperty("monotonic_ns_text", Long.toString(nanos));
         row.addProperty("elapsed_ns", nanos - started);
         if (event.equals("session_start")) {
             row.addProperty("build_flavor", "standard");

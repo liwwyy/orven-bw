@@ -161,14 +161,14 @@ public final class OrvenConfig extends Config {
     @Include public boolean autoSoupDisableLeft = true;
     @Include public boolean autoSoupScoreboardOnly = false;
     @Include public String autoSoupScoreboardWord = "mineberry.org";
-    @Include public int autoSoupConsumeMinMs = 30;
-    @Include public int autoSoupConsumeMaxMs = 55;
-    @Include public int autoSoupReturnMinMs = 33;
-    @Include public int autoSoupReturnMaxMs = 55;
-    @Include public int autoSoupMoveMinMs = 33;
-    @Include public int autoSoupMoveMaxMs = 44;
-    @Include public int autoSoupResponseTimeoutMs = 750;
-    @Include public int autoSoupCycleCooldownMs = 250;
+    @Include public int autoSoupConsumeMinMs = 110;
+    @Include public int autoSoupConsumeMaxMs = 135;
+    @Include public int autoSoupReturnMinMs = 113;
+    @Include public int autoSoupReturnMaxMs = 135;
+    @Include public int autoSoupMoveMinMs = 113;
+    @Include public int autoSoupMoveMaxMs = 124;
+    @Include public int autoSoupResponseTimeoutMs = 830;
+    @Include public int autoSoupCycleCooldownMs = 330;
     @Button(title = "Clear debug cache", text = "Clear click log", description = "Erase the existing click-debug.jsonl file. Debugging continues in the same file when enabled.", category = "ClickAssist", subcategory = "Advanced")
     public void clearDebugCache() {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
@@ -351,7 +351,7 @@ public final class OrvenConfig extends Config {
         option(collected, "autoSoupScoreboardWord", "Scoreboard matching text", "Match sidebar text ignoring case and colors. Default: mineberry.org. Also obeys General's global conditions.", Visualizer.TextVisualizer.class);
         String[] timings = {"autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupMoveMinMs", "autoSoupMoveMaxMs", "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs"};
         String[] titles = {"Minimum consume delay (ms)", "Maximum consume delay (ms)", "Minimum sword-return delay (ms)", "Maximum sword-return delay (ms)", "Minimum item-move delay (ms)", "Maximum item-move delay (ms)", "Server response timeout (ms)", "Cycle cooldown (ms)"};
-        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 30 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 55 ms.", "Shortest wait after using a soup before returning to a sword. Default: 33 ms.", "Longest wait before returning to a sword. Default: 55 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 33 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 44 ms. Always recheck source and destination.", "Wait this long for a soup or health update before abandoning an unconfirmed use or refill. Prevents repeated use of the same soup.", "Pause between healing/refill cycles, including failed attempts. Default: 250 ms."};
+        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 110 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 135 ms.", "Shortest wait after using a soup before returning to a sword. Default: 113 ms.", "Longest wait before returning to a sword. Default: 135 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 113 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 124 ms. Always recheck source and destination.", "Wait this long for a soup or health update before abandoning an unconfirmed use or refill. Prevents repeated use of the same soup.", "Pause between healing/refill cycles, including failed attempts. Default: 330 ms."};
         for (int i = 0; i < timings.length; i++) {
             option(collected, timings[i], titles[i], descriptions[i], Visualizer.SliderVisualizer.class);
             slider(collected, timings[i], i == 6 ? 100 : 0, i == 6 ? 3000 : 1000, 1);
@@ -412,7 +412,16 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 7) return false;
+        if (configSchema >= 8) return false;
+        if (configSchema == 7) {
+            // Upgrade old presets while preserving deliberately customized ranges.
+            if (autoSoupConsumeMinMs == 30 && autoSoupConsumeMaxMs == 55) { autoSoupConsumeMinMs = 110; autoSoupConsumeMaxMs = 135; }
+            if (autoSoupReturnMinMs == 33 && autoSoupReturnMaxMs == 55) { autoSoupReturnMinMs = 113; autoSoupReturnMaxMs = 135; }
+            if (autoSoupMoveMinMs == 33 && autoSoupMoveMaxMs == 44) { autoSoupMoveMinMs = 113; autoSoupMoveMaxMs = 124; }
+            if (autoSoupResponseTimeoutMs == 750) autoSoupResponseTimeoutMs = 830;
+            if (autoSoupCycleCooldownMs == 250) autoSoupCycleCooldownMs = 330;
+            configSchema = 8; return true;
+        }
         if (configSchema == 6) {
             var updated = new java.util.LinkedHashSet<String>();
             if (autoToolWhitelist != null) for (String id : autoToolWhitelist) {
@@ -421,7 +430,7 @@ public final class OrvenConfig extends Config {
                 if (!java.util.Set.of("chest", "trapped_chest", "ender_chest").contains(name)) updated.add(id);
             }
             updated.add("minecraft:end_stone"); autoToolWhitelist = updated.toArray(String[]::new);
-            configSchema = 7; return true;
+            configSchema = 7; migrateValues(); return true;
         }
         if (configSchema == 5) {
             if (hitEffectDurationMs == 500) hitEffectDurationMs = 350;

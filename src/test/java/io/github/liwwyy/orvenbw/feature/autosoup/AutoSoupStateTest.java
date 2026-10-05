@@ -95,4 +95,21 @@ class AutoSoupStateTest {
         state.reset(); inv.health = 20; inv.set(2, Kind.BOWL);
         assertEquals(Type.OPEN, state.poll(400 * MS, inv.snapshot(), OPTIONS).type());
     }
+    @Test void soupUseIsProtectedUntilReturnDeadlineButNeverAfterManualSlotChange() {
+        var options = new AutoSoupState.Options(4, 14, 2, true, 110, 135, 113, 135, 113, 124, 830, 330);
+        var state = new AutoSoupState(() -> .5); var inv = new Inventory(); inv.set(2, Kind.SOUP);
+        assertFalse(state.protectsUse(inv.selected));
+        inv.apply(state.poll(0, inv.snapshot(), options));
+        assertFalse(state.protectsUse(2));
+        assertEquals(Type.NONE, state.poll(122 * MS, inv.snapshot(), options).type());
+        assertEquals(Type.USE, state.poll(123 * MS, inv.snapshot(), options).type());
+        for (int ms = 150; ms <= 246; ms += 1) {
+            assertEquals(Type.NONE, state.poll(ms * MS, inv.snapshot(), options).type());
+            assertTrue(state.protectsUse(2), "Physical right-click release must not interrupt pending use");
+            assertFalse(state.protectsUse(0), "Manual switching must retain vanilla release");
+        }
+        inv.apply(state.poll(247 * MS, inv.snapshot(), options));
+        assertEquals(0, inv.selected); assertFalse(state.protectsUse(2));
+        state.reset(); assertFalse(state.protectsUse(2));
+    }
 }

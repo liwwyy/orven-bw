@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.6.1+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.6.2+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -103,7 +103,7 @@ Minecraft's interaction manager. There is no item spoofing.
   The 0.6.1 migration adds end stone and removes explicit chest/trapped-chest/ender-chest
   entries from existing whitelists, while preserving other custom entries.
 
-## AutoSoup (0.6.1)
+## AutoSoup (0.6.2)
 
 AutoSoup starts disabled and is designed for servers where using mushroom stew heals
 instantly. It does not fabricate local healing or attempt vanilla's 1.6-second food-use
@@ -112,17 +112,19 @@ optional feature-specific scoreboard filter is off by default and matches `mineb
 in the visible sidebar, ignoring case and colors.
 
 - **Healing:** sample one health threshold between 4 and 14 points (20 is full health)
-  per cycle. At or below that threshold, choose a random hotbar soup, wait 30–55 ms,
-  use it through Minecraft's normal interaction manager, then return to a sword after
-  33–55 ms. Prefer the original sword slot; with no sword, restore the original slot.
+  per cycle. At or below that threshold, choose a random hotbar soup, wait 110–135 ms,
+  use it through Minecraft's normal right-click action (block/entity/air interactions), then return to a sword after
+  113–135 ms. Prefer the original sword slot; with no sword, restore the original slot.
+  Vanilla physical-button release is suppressed only while this soup is selected and
+  awaiting its return deadline, so an unheld right mouse button cannot interrupt it.
   Use at most two soups per cycle by default, stopping sooner if health recovers.
   Each soup must produce a health gain or an inventory/count change before another
-  soup can be selected. Unconfirmed uses time out after 750 ms.
+  soup can be selected. Unconfirmed uses time out after 830 ms.
 - **Refill:** sample a threshold of zero or one soups remaining. Open a real survival
   inventory screen only if reserve soup and an empty/bowl hotbar slot exist. Prefer
   empty slots, then bowls; leave swords, armor, crafting slots and other items alone.
   Move one reserve soup stack with a normal hotbar-swap inventory action at a time,
-  with 33–44 ms sampled between actions. Bowls return to the source slot rather than
+  with 113–124 ms sampled between actions. Bowls return to the source slot rather than
   being discarded. Recompute each move from the current inventory. Rejected/stale
   moves time out. Close only the screen AutoSoup opened; user screens and held cursor
   items cancel automation and remain untouched. Inventory movement is never enabled.
@@ -131,7 +133,7 @@ in the visible sidebar, ignoring case and colors.
   while AutoSoup owns the hotbar. Manual slot changes cancel pending use; disabling
   the feature, death, world/player changes and lost gameplay context cancel the cycle.
 - **Advanced:** all consume, sword-return, item-move, response-timeout and cycle-cooldown
-  timings are here, in collapsed groups. The cycle cooldown defaults to 250 ms.
+  timings are here, in collapsed groups. The cycle cooldown defaults to 330 ms.
   Deadlines run on the client thread at tick/frame boundaries, without sleeps or a
   background thread; actual execution can be later than the sampled delay at low FPS.
 
@@ -290,7 +292,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.6.1**. The
+release (patch for fixes, minor for features). The current main version is **0.6.2**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
@@ -322,3 +324,6 @@ submissions, not confirmed server hits.
 Named sample pages default to All sessions so their charts cover the complete sample, matching the offline fit. Single-log viewing still defaults to the newest session.
 
 Startup baselines are fitted separately for building, steady and settling starts. The first-quarter fit subtracts the initial press already emitted at activation, avoiding an artificial extra-click bias in the ramp.
+
+The 0.6.2 configuration migration increases the old AutoSoup timing presets by 80 ms,
+including timeout/cooldown. Customized timing ranges remain unchanged.

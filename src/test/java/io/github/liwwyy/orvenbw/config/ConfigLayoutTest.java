@@ -85,7 +85,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(7, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -193,8 +193,24 @@ class ConfigLayoutTest {
         tree.getProp("autoSoupRefill").setAs(false);
         assertEquals(Property.Display.HIDDEN, tree.getProp("autoSoupRefillTiming", "autoSoupMoveMinMs").getDisplay());
         config.configSchema = 6; config.autoToolWhitelist = new String[]{"minecraft:planks", "minecraft:chest", "trapped_chest", "minecraft:ender_chest", "test:custom"};
-        assertTrue(config.migrateValues()); assertEquals(7, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
         assertArrayEquals(new String[]{"minecraft:planks", "test:custom", "minecraft:end_stone"}, config.autoToolWhitelist);
         assertFalse(config.migrateValues());
+    }
+    @Test void autoSoupTimingUpgradePreservesCustomRangesAndOnlyRunsOnce() {
+        var config = new OrvenConfig(); config.configSchema = 7;
+        config.autoSoupConsumeMinMs = 30; config.autoSoupConsumeMaxMs = 55;
+        config.autoSoupReturnMinMs = 33; config.autoSoupReturnMaxMs = 55;
+        config.autoSoupMoveMinMs = 33; config.autoSoupMoveMaxMs = 44;
+        config.autoSoupResponseTimeoutMs = 750; config.autoSoupCycleCooldownMs = 250;
+        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
+        assertEquals(110, config.autoSoupConsumeMinMs); assertEquals(135, config.autoSoupConsumeMaxMs);
+        assertEquals(113, config.autoSoupReturnMinMs); assertEquals(135, config.autoSoupReturnMaxMs);
+        assertEquals(113, config.autoSoupMoveMinMs); assertEquals(124, config.autoSoupMoveMaxMs);
+        assertEquals(830, config.autoSoupResponseTimeoutMs); assertEquals(330, config.autoSoupCycleCooldownMs);
+        assertFalse(config.migrateValues());
+        config.configSchema = 7; config.autoSoupConsumeMinMs = 200; config.autoSoupConsumeMaxMs = 300;
+        assertTrue(config.migrateValues());
+        assertEquals(200, config.autoSoupConsumeMinMs); assertEquals(300, config.autoSoupConsumeMaxMs);
     }
 }

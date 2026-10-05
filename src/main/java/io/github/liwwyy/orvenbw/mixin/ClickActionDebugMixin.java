@@ -21,11 +21,11 @@ public abstract class ClickActionDebugMixin {
 
     private static void start(int side) {
         var mod = OrvenBw.instance();
-        if (mod != null && mod.config().debugEnabled)
+        if (mod != null && mod.config().debugEnabled && !mod.autoSoup().issuingUse())
             mod.clickOrigins().beginAction(side, System.nanoTime());
     }
     private static void end() {
         var mod = OrvenBw.instance();
-        if (mod != null) mod.clickOrigins().endAction();
+        if (mod != null && !mod.autoSoup().issuingUse()) mod.clickOrigins().endAction();
     }
 }

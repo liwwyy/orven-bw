@@ -25,6 +25,8 @@ public final class AutoSoupState {
     private SoupInventory.Move pendingMove;
     public AutoSoupState(DoubleSupplier random) { this.random = random; }
     public boolean busy() { return phase != Phase.IDLE; }
+    /** Keep vanilla's physical-button release from ending our pending soup use. */
+    public boolean protectsUse(int selectedSlot) { return phase == Phase.RETURN && selectedSlot == soupSlot; }
     public int soupSlot() { return soupSlot; }
     public int originalSlot() { return original; }
     public Phase phase() { return phase; }

@@ -5,6 +5,7 @@ import io.github.liwwyy.orvenbw.config.OrvenConfig;
 import io.github.liwwyy.orvenbw.feature.ClientFeature;
 import io.github.liwwyy.orvenbw.feature.ScoreboardGate;
 import io.github.liwwyy.orvenbw.mixin.InteractionManagerAccessor;
+import io.github.liwwyy.orvenbw.mixin.SoupUseAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.game.inventory.SurvivalInventoryScreen;
 import net.minecraft.item.Item;
@@ -21,6 +22,7 @@ public final class AutoSoupFeature implements ClientFeature {
     private Minecraft client;
     private Object world, player;
     private SurvivalInventoryScreen ownedScreen;
+    private boolean issuingUse;
     public AutoSoupFeature(OrvenConfig config) { this.config = config; }
     @Override public boolean ownsScreen(Minecraft mc) {
         return ownedScreen != null && mc.screen == ownedScreen && mc.world == world && mc.player == player;
@@ -33,7 +35,13 @@ public final class AutoSoupFeature implements ClientFeature {
                 && (mc.screen == null && mc.focused || ownsScreen(mc))
                 && (!config.autoSoupScoreboardOnly || ScoreboardGate.sidebarMatches(mc, config.autoSoupScoreboardWord));
     }
+    public boolean issuingUse() { return issuingUse; }
     public boolean busy() { return config.autoSoupEnabled && state.busy(); }
+    public boolean protectsUse(Minecraft mc) {
+        return mc.player == player && mc.world == world && eligible(mc)
+                && state.protectsUse(mc.player.inventory.selectedSlot)
+                && kind(mc.player.getItemInHand()) == Kind.SOUP;
+    }
     public boolean blocksLeft() { return busy() && config.autoSoupDisableLeft; }
     @Override public void tick(Minecraft mc) { poll(mc); }
     public void frame(Minecraft mc) { poll(mc); }
@@ -92,8 +100,16 @@ public final class AutoSoupFeature implements ClientFeature {
     private void use(Minecraft mc) {
         var mod = OrvenBw.instance();
         if (config.debugEnabled) mod.clickOrigins().beginDirectAction("auto_soup", 1, mc.options.useKey.getKeyCode(), System.nanoTime());
-        try { mc.interactionManager.useItem(mc.player, mc.world, mc.player.getItemInHand()); }
-        finally { if (config.debugEnabled) mod.clickOrigins().endAction(); }
+        issuingUse = true;
+        try {
+            // Follow the same block/entity/air interaction path as a real right click.
+            // Vanilla skips doUse while mining, so release mining before our soup action.
+            mc.interactionManager.stopMiningBlock();
+            ((SoupUseAccessor) mc).orven$useSoup();
+        } finally {
+            issuingUse = false;
+            if (config.debugEnabled) mod.clickOrigins().endAction();
+        }
     }
     private AutoSoupState.Options options() {
         return new AutoSoupState.Options(config.autoSoupHealthMin, config.autoSoupHealthMax, config.autoSoupMaxPerCycle, config.autoSoupRefill,

@@ -85,7 +85,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -194,7 +194,7 @@ class ConfigLayoutTest {
         tree.getProp("autoSoupRefill").setAs(false);
         assertEquals(Property.Display.HIDDEN, tree.getProp("autoSoupRefillTiming", "autoSoupMoveMinMs").getDisplay());
         config.configSchema = 6; config.autoToolWhitelist = new String[]{"minecraft:planks", "minecraft:chest", "trapped_chest", "minecraft:ender_chest", "test:custom"};
-        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
         assertArrayEquals(new String[]{"minecraft:planks", "test:custom", "minecraft:end_stone"}, config.autoToolWhitelist);
         assertFalse(config.migrateValues());
     }
@@ -204,14 +204,39 @@ class ConfigLayoutTest {
         config.autoSoupReturnMinMs = 33; config.autoSoupReturnMaxMs = 55;
         config.autoSoupMoveMinMs = 33; config.autoSoupMoveMaxMs = 44;
         config.autoSoupResponseTimeoutMs = 750; config.autoSoupCycleCooldownMs = 250;
-        assertTrue(config.migrateValues()); assertEquals(8, config.configSchema);
-        assertEquals(110, config.autoSoupConsumeMinMs); assertEquals(135, config.autoSoupConsumeMaxMs);
-        assertEquals(113, config.autoSoupReturnMinMs); assertEquals(135, config.autoSoupReturnMaxMs);
-        assertEquals(113, config.autoSoupMoveMinMs); assertEquals(124, config.autoSoupMoveMaxMs);
+        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertEquals(140, config.autoSoupConsumeMinMs); assertEquals(220, config.autoSoupConsumeMaxMs);
+        assertEquals(160, config.autoSoupReturnMinMs); assertEquals(260, config.autoSoupReturnMaxMs);
+        assertEquals(150, config.autoSoupMoveMinMs); assertEquals(230, config.autoSoupMoveMaxMs);
         assertEquals(830, config.autoSoupResponseTimeoutMs); assertEquals(330, config.autoSoupCycleCooldownMs);
         assertFalse(config.migrateValues());
         config.configSchema = 7; config.autoSoupConsumeMinMs = 200; config.autoSoupConsumeMaxMs = 300;
         assertTrue(config.migrateValues());
         assertEquals(200, config.autoSoupConsumeMinMs); assertEquals(300, config.autoSoupConsumeMaxMs);
+    }
+    @Test void entityFloorDefaultsAndDependenciesAndVersionSevenMigration() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        assertTrue(config.entityCpsFloorEnabled); assertEquals(8, config.entityCpsFloor);
+        var floor = tree.getProp("behavior", "entityCpsFloor");
+        assertEquals(Property.Display.SHOWN, floor.getDisplay());
+        tree.getProp("behavior", "entityCpsFloorEnabled").setAs(false);
+        assertEquals(Property.Display.HIDDEN, floor.getDisplay());
+        config.configSchema = 8;
+        config.autoToolWhitelist = new String[]{"minecraft:glass", "stained_glass", "test:glass", "minecraft:wool"};
+        config.autoSoupConsumeMinMs = 110; config.autoSoupConsumeMaxMs = 135;
+        config.autoSoupReturnMinMs = 113; config.autoSoupReturnMaxMs = 135;
+        config.autoSoupMoveMinMs = 113; config.autoSoupMoveMaxMs = 124;
+        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertArrayEquals(new String[]{"test:glass", "minecraft:wool"}, config.autoToolWhitelist);
+        assertEquals(140, config.autoSoupConsumeMinMs); assertEquals(220, config.autoSoupConsumeMaxMs);
+        assertEquals(160, config.autoSoupReturnMinMs); assertEquals(260, config.autoSoupReturnMaxMs);
+        assertEquals(150, config.autoSoupMoveMinMs); assertEquals(230, config.autoSoupMoveMaxMs);
+        assertEquals(2000, config.autoSoupHoldTimeoutMs);
+        assertFalse(config.migrateValues());
+        config.configSchema = 8; config.autoToolWhitelist = new String[]{"minecraft:glass"};
+        config.autoSoupConsumeMinMs = 250; config.autoSoupConsumeMaxMs = 450;
+        config.migrateValues(); assertEquals(250, config.autoSoupConsumeMinMs); assertEquals(450, config.autoSoupConsumeMaxMs);
+        config.autoToolWhitelist = new String[]{"minecraft:glass"};
+        assertFalse(config.migrateValues()); assertEquals("minecraft:glass", config.autoToolWhitelist[0]);
     }
 }

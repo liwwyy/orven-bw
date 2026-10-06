@@ -85,4 +85,30 @@ class ClickProfileSessionTest {
         assertTrue(Double.isFinite(session.target(Long.MAX_VALUE/2,true,HUMBLE)));
         assertEquals(new ClickProfileSession.Options(0,true,22),new ClickProfileSession.Options(99,true,Double.NaN));
     }
+    @Test void entityFloorPreservesRampAndCeilingAndDoesNotResetOnTargetChanges() {
+        var baselineRandom = new Random(34); var floorRandom = new Random(34);
+        var baseline = new ClickProfileSession(baselineRandom::nextDouble, 0);
+        var floored = new ClickProfileSession(floorRandom::nextDouble, 0);
+        boolean foundDip = false;
+        for (long t = 0; t < 120*SECOND; t += 50_000_000) {
+            double normal = baseline.target(t, true, HUMBLE);
+            double boosted = floored.target(t, true, HUMBLE, true, 8);
+            if (t < 1_500_000_000L) assertEquals(normal, boosted);
+            else { assertEquals(Math.max(normal, 8), boosted); foundDip |= normal < 8; }
+        }
+        assertTrue(foundDip);
+        long next = 120*SECOND;
+        assertEquals(baseline.target(next, true, HUMBLE), floored.target(next, true, HUMBLE, false, 8));
+        assertEquals(0, floored.target(next+SECOND, false, HUMBLE, true, 8));
+        var limited = new ClickProfileSession(new Random(4)::nextDouble, 0);
+        var options = new ClickProfileSession.Options(0, true, 6.5);
+        limited.target(0, true, options, true, 8);
+        assertEquals(6.5, limited.target(2*SECOND, true, options, true, 8));
+    }
+    @Test void entityFloorNeverChangesRightClickProfile() {
+        var a = new ClickProfileSession(new Random(12)::nextDouble, 1);
+        var b = new ClickProfileSession(new Random(12)::nextDouble, 1);
+        for (long t = 0; t < 10*SECOND; t += 50_000_000)
+            assertEquals(a.target(t, true, HUMBLE), b.target(t, true, HUMBLE, true, 22));
+    }
 }

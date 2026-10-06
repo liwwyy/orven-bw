@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.6.3+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.7.0+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -101,9 +101,11 @@ Minecraft's interaction manager. There is no item spoofing.
   families. Selecting any wooden block includes wood-material blocks except ladders and
   chest variants. Ladders have their own entry. This includes all plank and log variants.
   The 0.6.1 migration adds end stone and removes explicit chest/trapped-chest/ender-chest
-  entries from existing whitelists, while preserving other custom entries.
+  entries from existing whitelists, while preserving other custom entries. The 0.7.0
+  migration removes normal/stained glass entries; these can still be added explicitly
+  afterwards. Other custom entries are preserved.
 
-## AutoSoup (0.6.3)
+## AutoSoup (0.7.0)
 
 AutoSoup starts disabled and is designed for servers where using mushroom stew heals
 instantly, and can hold right-click through vanilla's food-use animation. It never
@@ -112,10 +114,10 @@ optional feature-specific scoreboard filter is off by default and matches `mineb
 in the visible sidebar, ignoring case and colors.
 
 - **Healing:** sample one health threshold between 4 and 14 points (20 is full health)
-  per cycle. At or below that threshold, choose a random hotbar soup, wait 110–135 ms,
+  per cycle. At or below that threshold, choose a random hotbar soup, wait 140–220 ms,
   queue right-click with the same `KeyBinding.click` used by Click Assist and keep
   `KeyBinding.set` pressed while the soup remains selected. Do not return to a sword
-  merely because 113–135 ms elapsed: wait for consumption or a maximum hold of
+  merely because 160–260 ms elapsed: wait for consumption or a maximum hold of
   2000 ms (configurable in Advanced). The sampled return delay is the minimum wait
   after starting use. Prefer the original sword slot; with no sword, restore the
   original slot. Native tick input handles item use/release; no direct item-use call,
@@ -128,7 +130,7 @@ in the visible sidebar, ignoring case and colors.
   inventory screen only if reserve soup and an empty/bowl hotbar slot exist. Prefer
   empty slots, then bowls; leave swords, armor, crafting slots and other items alone.
   Move one reserve soup stack with a normal hotbar-swap inventory action at a time,
-  with 113–124 ms sampled between actions. Bowls return to the source slot rather than
+  with 150–230 ms sampled between actions. Bowls return to the source slot rather than
   being discarded. Recompute each move from the current inventory. Rejected/stale
   moves time out. Close only the screen AutoSoup opened; user screens and held cursor
   items cancel automation and remain untouched. Inventory movement is never enabled.
@@ -163,13 +165,19 @@ remain hidden compatibility keys; activation conditions and enabled states are p
 - **Separate left/right behavior** (default on): use distinct fitted button models.
   Turning it off uses independent left-model instances for both buttons, with right
   target CPS reduced by 10% after the shared target ceiling is applied.
+- **Try to maintain high CPS when targeting an entity** (default on): after the
+  first 1.5 seconds, raise the left-click total target to at least 8 CPS while targeting
+  a living entity. The minimum is editable from 1–22 CPS. It covers physical boost,
+  spam button and mouse-hold clicking, preserves every activation filter, and obeys
+  the ceiling. Disable it to retain the complete fitted dips. Actual rolling counts
+  can still vary. It never changes right clicks or the button-hold feature.
 - **Target CPS ceiling**: decimal slider, default 22, range 1–22. Physical input is
   never suppressed. Generated rolling totals are bounded by the ceiling rounded up,
   so a fractional target can alternate integer counts across one-second windows.
 
 A bout requires ≥10 presses over ≥2 seconds, split at native clock resets or gaps
 >750 ms. Rank by `(presses − 1) / duration`, retaining `ceil(60% × eligible bouts)`.
-The fitted model retains 27 left bouts (1,291 presses, 91.9 active seconds) and 30 right
+The currently bundled 0.3.0 model retains 27 left bouts (1,291 presses, 91.9 active seconds) and 30 right
 bouts (963 presses, 121.4 active seconds). liwwyy is a cross-check only, not blended in.
 Startup types are building, steady and fast-then-settling; a universal low-to-high ramp
 is not imposed. Short samples cannot establish long-session fatigue.
@@ -196,19 +204,44 @@ Reproduce the fit from local samples (Python standard library only):
 ```sh
 python3 scripts/fit_click_profiles.py \
   --samples-directory /home/user/Projects/orven-bw/click_logs \
-  --output .reference/click-profile-report.json \
+  --wren-cohort older \
+  --output .reference/click-profile-report-0.7.0.json \
   --model-output src/main/resources/assets/orvenbw/click-profile-model.json
 python3 -m unittest discover -s scripts -p 'test*.py'
 ```
 
-The report includes exact sample hashes, selection summaries, liwwyy cross-checks,
-five-fold validation split by whole bouts, and intended-versus-queued scheduler
-simulations. The initial held-out CPS percentile error is ≤1 CPS, interval-category
-share error ≤3.89 percentage points, and adjacent-interval correlation error ≤0.115.
-Startup type shares also fall within the small sample’s 95% Wilson intervals.
-These checks measure agreement with the two samples, not server acceptance.
-Keep samples and reports local. The fit command rewrites the aggregate model only when
-`--model-output` is provided; omit it for read-only fitting and report generation.
+The report includes exact sample hashes, chronological session metadata and newest/older
+cohorts, separate artificial-only and combined totals, and equivalent-clock comparisons.
+Native mouse intervals are compared with modeled intended deadlines; Minecraft-observed
+physical input is compared with actual generated queues. Missing intended timestamps in
+older logs are reported rather than fabricated. All sessions remain in their original
+log files; the fitter and viewer separate them without rewriting the logs.
+
+The 0.7.0 candidate uses the fastest 60% of eligible older Wren bouts: 35 left bouts
+(1,660 presses, 119.4 seconds) and 37 right bouts (1,166 presses, 142.3 seconds).
+The newest recorded session reports 0.6.1 and has only two left presses, so it is too
+small to fit. The selected old left samples have CPS percentiles 7 / 12 / 14 / 16 / 19;
+the older artificial sample has 5 / 9 / 13 / 15 / 17. Both human and artificial observed
+input is tick-batched: approximately 12.8% and 15.0% of their respective within-bout
+left intervals are under 1 ms. Wren's native mouse intervals have no such pairs.
+This batching alone does not identify artificial input.
+
+The experimental schema-2 model samples a complete aggregate startup trajectory
+(baseline plus six quarter-second ratios) instead of independent ramp steps. Runtime
+supports schemas 1 and 2; the fitter writes a candidate only when all validation gates
+pass. The gate now holds out each complete Wren session, selecting the best 60% from
+training and test sessions independently. It requires CPS percentile error ≤2 CPS,
+interval-category share error ≤5 percentage points, correlation error ≤0.15, and startup
+proportions within the reference Wilson intervals. The candidate failed narrowly:
+left category error 5.128 percentage points and right correlation error 0.1516. Therefore
+0.7.0 retains the existing bundled schema-1 model. No seed/threshold adjustments were
+made to force acceptance. The report is `.reference/click-profile-report-0.7.0.json`.
+
+Use `--wren-cohort newest` to report the latest session alone, or `all` for every session.
+Insufficient data never replaces the bundled model. The viewer offers Newest, Older,
+All, and individual sessions, sorted by session start date and labelled with version,
+date and full-log click count. Old log formats remain readable. Statistical agreement
+with these local samples does not establish server acceptance.
 
 ## CPS HUD
 
@@ -296,7 +329,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.6.3**. The
+release (patch for fixes, minor for features). The current main version is **0.7.0**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
@@ -305,6 +338,10 @@ runs. Successful main/tag builds publish a release named `v{mod_version}` with t
 runtime jar and its SHA-256 checksum. An existing release is retained; bump `mod_version`
 to publish the next one. Explicit version tags must match `gradle.properties`. Pull
 requests build artifacts without publishing. Actions use JDK 27 and target Java 25.
+The workflow pins `ubuntu-24.04` and publishes from the same build runner, eliminating
+second-runner acquisition for a separate release job. Artifacts are uploaded before
+publication; transient publishing failures get three attempts separated by five seconds.
+Existing releases are never overwritten. All Java, Python, and viewer checks run in CI.
 
 Reference sources, including Raven-bS and the supplied hit-show fragment, are under
 ignored `.reference/`. Original icons are under ignored `icons/`; the ClickAssist SVG is
@@ -331,3 +368,8 @@ Startup baselines are fitted separately for building, steady and settling starts
 
 The 0.6.2 configuration migration increases the old AutoSoup timing presets by 80 ms,
 including timeout/cooldown. Customized timing ranges remain unchanged.
+
+The 0.7.0 migration upgrades unchanged AutoSoup presets to consume 140–220 ms,
+sword-return minimum 160–260 ms, and item moves 150–230 ms. Each action samples its
+range independently. Custom ranges, the working keybinding hold and 2000 ms maximum
+hold stay as configured. Config schema is now 9.

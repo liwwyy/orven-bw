@@ -8,8 +8,8 @@ if (sampleName) {
 }
 const colors = {mouse:'#7dd3fc',keyboard_binding:'#38bdf8',cps_boost:'#c4a5ff',spam_click:'#fbad73',mouse_hold_click:'#89e3ac',button_hold:'#f0a8d9',unattributed:'#aab8cc'};
 const names = {mouse:'Physical mouse',keyboard_binding:'Physical keyboard',cps_boost:'Physical CPS boost',spam_click:'Spam keybind',mouse_hold_click:'Mouse hold click',button_hold:'Button hold',unattributed:'Unattributed binding'};
-let data=[], selected=sampleName?'all':'latest', view=null, bounds=[0,1], plots=new Map(), busy=false, follow=true;
-let enabled=new Set(Object.keys(names)), sessionInfo={}, timingChosen=false;
+let data=[], selected=sampleName?'all':'newest', view=null, bounds=[0,1], plots=new Map(), busy=false, follow=true;
+let enabled=new Set(Object.keys(names)), sessionInfo={}, sessionOrder=[], timingChosen=false;
 for(const [method,name] of Object.entries(names)){
  const label=document.createElement('label'), input=document.createElement('input'); input.type='checkbox';input.checked=true;
  label.style.color=colors[method];label.append(input,document.createTextNode(name));$('methods').append(label);
@@ -18,11 +18,13 @@ for(const [method,name] of Object.entries(names)){
 function click(row){return ['press','queue','invoke','send'].includes(row.action);}
 function nativeMode(){return $('timing').value==='native';}
 function plannedMode(){return $('timing').value==='planned';}
-function defaultTiming(){const ids=selected==='all'?[...new Set(data.map(r=>r.session))]:[selected];return ids.length&&ids.every(id=>sessionInfo[id]?.build_flavor==='recording')?'native':'observed';}
+function selectedIds(){return selected==='all'?sessionOrder:selected==='newest'?sessionOrder.slice(-1):selected==='older'?sessionOrder.slice(0,-1):[selected];}
+function multipleSessions(){return selected==='all'||selected==='older';}
+function defaultTiming(){const ids=selectedIds();return ids.length&&ids.every(id=>sessionInfo[id]?.build_flavor==='recording')?'native':'observed';}
 function time(row){
- if(plannedMode())return selected==='all'?row._intended_epoch_ms:row._intended_elapsed_ms;
- if(nativeMode()&&Number.isFinite(row._native_elapsed_ms))return selected==='all'?row._native_epoch_ms:row._native_elapsed_ms;
- return selected!=='all'&&Number.isFinite(row.elapsed_ns)?row.elapsed_ns/1e6:row.timestamp_ms;
+ if(plannedMode())return multipleSessions()?row._intended_epoch_ms:row._intended_elapsed_ms;
+ if(nativeMode()&&Number.isFinite(row._native_elapsed_ms))return multipleSessions()?row._native_epoch_ms:row._native_elapsed_ms;
+ return !multipleSessions()&&Number.isFinite(row.elapsed_ns)?row.elapsed_ns/1e6:row.timestamp_ms;
 }
 function stageMatches(r){
  const stage=$('timing').value;
@@ -32,7 +34,7 @@ function stageMatches(r){
  if(stage==='planned')return r.source==='artificial'&&r.action==='queue'&&Number.isFinite(r._intended_elapsed_ms);
  return !(r.source==='physical'&&r.action==='queue');
 }
-function filtered(){return data.filter(r=>(selected==='all'||r.session===selected)&&enabled.has(r.method)&&stageMatches(r)&&($('side').value==='all'||($('side').value==='both'?['left','right'].includes(r.side):r.side===$('side').value))&&($('releases').checked||click(r))).sort((a,b)=>time(a)-time(b));}
+function filtered(){return data.filter(r=>selectedIds().includes(r.session)&&enabled.has(r.method)&&stageMatches(r)&&($('side').value==='all'||($('side').value==='both'?['left','right'].includes(r.side):r.side===$('side').value))&&($('releases').checked||click(r))).sort((a,b)=>time(a)-time(b));}
 function intervals(rows){
  const previous=new Map(),result=[];
  for(const r of rows.filter(click)){
@@ -83,10 +85,10 @@ function render(){
 async function refresh(){
  if(busy)return;busy=true;
  try{const result=await(await fetch(`${location.pathname.replace(/\/$/, '')}/api/events`)).json();data=result.events;sessionInfo=result.sessions||{};
- const sessions=[...new Set(data.map(r=>r.session))],session=$('session');const old=selected;session.replaceChildren();
- const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;session.append(o);};option('all','All sessions');
- for(const id of sessions){const first=data.find(r=>r.session===id);option(id,new Date(first.timestamp_ms).toLocaleString()+' · '+id.slice(0,8));}
- if(selected==='latest'||!sessions.includes(selected)&&selected!=='all'){selected=sessions.at(-1)||'all';view=null;}session.value=selected;
+ const sessions=result.session_order||[...new Set(data.map(r=>r.session))].sort((a,b)=>(sessionInfo[a]?.timestamp_ms||0)-(sessionInfo[b]?.timestamp_ms||0));sessionOrder=sessions;const session=$('session');session.replaceChildren();
+ const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;session.append(o);};option('all','All sessions');option('newest','Newest session');option('older','Older sessions');
+ for(const id of sessions){const info=sessionInfo[id]||{};const first=data.find(r=>r.session===id);option(id,new Date(info.timestamp_ms??first?.timestamp_ms??0).toLocaleString()+' · '+(info.mod_version||'unknown version')+' · '+(info.click_count??0)+' clicks · '+id.slice(0,8));}
+ if(!['all','newest','older'].includes(selected)&&!sessions.includes(selected)){selected='newest';view=null;}session.value=selected;
  if(!timingChosen)$('timing').value=defaultTiming();
  $('status').textContent=result.path+' · '+result.retained+' retained / '+result.seen+' event records · '+result.malformed+' malformed lines skipped';
  $('notice').textContent=result.error||(!data.length?'No clicks yet. Enable Debug mode in ClickAssist → Advanced and start clicking.':result.seen>result.retained?'Only the most recent records are shown; use --max-events to retain more.':'');

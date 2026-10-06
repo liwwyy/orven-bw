@@ -5,6 +5,7 @@ import io.github.liwwyy.orvenbw.feature.ClientFeature;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.options.KeyBinding;
 import net.minecraft.entity.living.player.PlayerEntity;
+import net.minecraft.entity.living.LivingEntity;
 import net.minecraft.item.*;
 import net.minecraft.world.HitResult;
 import java.util.concurrent.ThreadLocalRandom;
@@ -128,7 +129,9 @@ public final class ClickAssistFeature implements ClientFeature {
                 sources[button] = source; profiles[button] = profile;
             }
             double base = engine.manualRate(button, now);
-            double target = sessions[button].target(now, clicking, profile);
+            boolean maintain = button == 0 && config.entityCpsFloorEnabled && entityTarget(mc)
+                    && mc.crosshairTarget.entity instanceof LivingEntity entity && entity.isAlive();
+            double target = sessions[button].target(now, clicking, profile, maintain, config.entityCpsFloor);
             double generated = Math.max(0, target - base);
             final int side = button, clickSource = source;
             engine.pollDue(button, now, generated, clicking, spamming ? 0 : config.boostDelayMs * 1_000_000L,

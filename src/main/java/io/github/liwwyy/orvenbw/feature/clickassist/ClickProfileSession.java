@@ -21,10 +21,12 @@ public final class ClickProfileSession {
         double[] durations, transitions, categories;
         double[][] category_transitions, intervals;
     }
+    private static final class Startup { double rate; double[] ratios; }
     private static final class Side {
         double median_cps;
         double[] initial, startup_weights;
         double[][] startup_rates;
+        Startup[][] startup_trajectories;
         double[][][] startup_ratios;
         State[] states;
         boolean rare_peak;
@@ -39,7 +41,7 @@ public final class ClickProfileSession {
         try (var input = ClickProfileSession.class.getResourceAsStream("/assets/orvenbw/click-profile-model.json")) {
             if (input == null) throw new IllegalStateException("Click profile model is missing");
             Model model = new Gson().fromJson(new InputStreamReader(input, StandardCharsets.UTF_8), Model.class);
-            if (model.schema != 1 || model.sides.size() != 2) throw new IllegalStateException("Unsupported click profile model");
+            if ((model.schema != 1 && model.schema != 2) || model.sides.size() != 2) throw new IllegalStateException("Unsupported click profile model");
             return model;
         } catch (java.io.IOException exception) { throw new ExceptionInInitializerError(exception); }
     }
@@ -57,6 +59,9 @@ public final class ClickProfileSession {
         this.random = random; this.button = button;
     }
     public double target(long now, boolean eligible, Options requested) {
+        return target(now, eligible, requested, false, 0);
+    }
+    public double target(long now, boolean eligible, Options requested, boolean entityTarget, double minimum) {
         if (!eligible) { reset(); return 0; }
         if (!active || !requested.equals(options)) start(now, requested);
         double elapsed = Math.max(0, (now - started) / SECOND);
@@ -84,7 +89,10 @@ public final class ClickProfileSession {
             }
             if (elapsed < peakUntil) rate = peakRate;
         }
-        return Math.max(1, Math.min(rate, options.ceiling()) * multiplier);
+        double target = Math.max(1, Math.min(rate, options.ceiling()) * multiplier);
+        if (button == 0 && entityTarget && elapsed >= 1.5 && Double.isFinite(minimum))
+            target = Math.max(target, Math.min(options.ceiling(), Math.clamp(minimum, 1, 22)));
+        return target;
     }
     private void start(long now, Options requested) {
         active = true; started = now; options = requested;
@@ -94,9 +102,16 @@ public final class ClickProfileSession {
         transitionAt = 0; transitionFrom = model.states[state].rate;
         until = draw(model.states[state].durations);
         int mode = choose(model.startup_weights);
-        for (int i = 0; i < 6; i++) startup[i] = Math.clamp(draw(model.startup_ratios[mode][i]), .25, 2);
+        if (model.startup_trajectories != null && model.startup_trajectories[mode].length > 0) {
+            Startup[] trajectories = model.startup_trajectories[mode];
+            Startup trajectory = trajectories[(int) (unit() * trajectories.length)];
+            startRate = trajectory.rate;
+            for (int i = 0; i < 6; i++) startup[i] = Math.clamp(trajectory.ratios[i], .25, 2);
+        } else {
+            for (int i = 0; i < 6; i++) startup[i] = Math.clamp(draw(model.startup_ratios[mode][i]), .25, 2);
+            startRate = draw(model.startup_rates[mode]);
+        }
         startup[6] = 1;
-        startRate = draw(model.startup_rates[mode]);
         peakAt = 30 + exponential(90); peakUntil = 0;
     }
     /** Dimensionless interval; dividing by generated CPS supplies only the missing physical rate. */

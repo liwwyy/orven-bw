@@ -106,10 +106,15 @@ class LogCache:
                             if not isinstance(row, dict):
                                 raise ValueError('Expected an object')
                             if row.get('event') == 'session_start' and isinstance(row.get('session'), str):
-                                self.sessions[row['session']] = row
+                                previous = self.sessions.setdefault(row['session'], {})
+                                previous.update(row)
+                                previous.setdefault('click_count', 0)
                             if row.get('event') in ('input', 'action', 'packet'):
                                 if not isinstance(row.get('timestamp_ms'), (int, float)) or not math.isfinite(row['timestamp_ms']) or not isinstance(row.get('session'), str):
                                     raise ValueError('Missing timestamp/session')
+                                info = self.sessions.setdefault(row['session'], dict(timestamp_ms=row['timestamp_ms'], mod_version='unknown', click_count=0))
+                                if row.get('event') == 'input' and (row.get('action') == 'press' or row.get('source') == 'artificial' and row.get('action') == 'queue'):
+                                    info['click_count'] = info.get('click_count', 0) + 1
                                 self.rows.append(self.annotate(row))
                                 self.seen += 1
                         except (ValueError, UnicodeDecodeError):
@@ -120,7 +125,8 @@ class LogCache:
             except OSError as exception:
                 error = str(exception)
             return dict(events=list(self.rows), path=str(path), seen=self.seen,
-                        retained=len(self.rows), malformed=self.malformed, error=error, sessions=self.sessions.copy())
+                        retained=len(self.rows), malformed=self.malformed, error=error, sessions={sid:info.copy() for sid,info in self.sessions.items()},
+                        session_order=sorted(self.sessions, key=lambda sid: (self.sessions[sid].get('timestamp_ms', 0), sid)))
 
 
 def handler_for(cache, samples=None):

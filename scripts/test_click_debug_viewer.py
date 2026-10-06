@@ -145,6 +145,18 @@ class ViewerTests(unittest.TestCase):
             with urlopen(url + '/' + name + '/api/events') as response:
                 self.assertEqual(expected, json.load(response)['events'][0]['timestamp_ms'])
 
+    def test_session_cohorts_follow_start_dates_and_counts_survive_retention(self):
+        self.append(dict(event='session_start',session='new',timestamp_ms=200,mod_version='0.6.1'))
+        self.append(event(201,'new')); self.append(event(202,'new'))
+        self.append(dict(event='session_start',session='old',timestamp_ms=100,mod_version='0.2.1'))
+        for i in range(5): self.append(event(100+i,'old'))
+        result=self.cache.snapshot()
+        self.assertEqual(['old','new'],result['session_order'])
+        self.assertEqual(2,result['sessions']['new']['click_count'])
+        self.assertEqual(5,result['sessions']['old']['click_count'])
+        self.assertEqual('0.6.1',result['sessions']['new']['mod_version'])
+        self.assertEqual(3,result['retained'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -110,6 +110,8 @@ public final class OrvenConfig extends Config {
     @Include public int clickingProfile = 0;
     @Include public boolean separateClickSides = true;
     @Include public double profileCpsCeiling = 22;
+    @Include public boolean entityCpsFloorEnabled = true;
+    @Include public double entityCpsFloor = 8;
     @Include public double highCps = 14;
     @Include public double mediumCps = 12.5;
     @Include public double lowCps = 9.5;
@@ -150,7 +152,7 @@ public final class OrvenConfig extends Config {
     @ItemList(title = "Ignored held items", description = "Pause AutoTool while holding any item in this list. Items match exactly.", category = "AutoTool", subcategory = "Filters")
     public String[] autoToolIgnoredItems = {};
     @ItemList(title = "Allowed blocks", description = "Select block items. One wool, glass or hardened-clay entry includes every color; one wooden block includes the wood family. Non-block items are ignored.", category = "AutoTool", subcategory = "Filters")
-    public String[] autoToolWhitelist = {"minecraft:wool", "minecraft:sandstone", "minecraft:glass", "minecraft:ladder", "minecraft:planks", "minecraft:log", "minecraft:obsidian", "minecraft:hardened_clay", "minecraft:end_stone"};
+    public String[] autoToolWhitelist = {"minecraft:wool", "minecraft:sandstone", "minecraft:ladder", "minecraft:planks", "minecraft:log", "minecraft:obsidian", "minecraft:hardened_clay", "minecraft:end_stone"};
     @ItemList(title = "Blocked blocks", description = "Never switch for these block families, even if allowed above. Uses the same color and wood grouping as the whitelist.", category = "AutoTool", subcategory = "Filters")
     public String[] autoToolBlacklist = {};
     @Include public boolean autoSoupEnabled = false;
@@ -161,12 +163,12 @@ public final class OrvenConfig extends Config {
     @Include public boolean autoSoupDisableLeft = true;
     @Include public boolean autoSoupScoreboardOnly = false;
     @Include public String autoSoupScoreboardWord = "mineberry.org";
-    @Include public int autoSoupConsumeMinMs = 110;
-    @Include public int autoSoupConsumeMaxMs = 135;
-    @Include public int autoSoupReturnMinMs = 113;
-    @Include public int autoSoupReturnMaxMs = 135;
-    @Include public int autoSoupMoveMinMs = 113;
-    @Include public int autoSoupMoveMaxMs = 124;
+    @Include public int autoSoupConsumeMinMs = 140;
+    @Include public int autoSoupConsumeMaxMs = 220;
+    @Include public int autoSoupReturnMinMs = 160;
+    @Include public int autoSoupReturnMaxMs = 260;
+    @Include public int autoSoupMoveMinMs = 150;
+    @Include public int autoSoupMoveMaxMs = 230;
     @Include public int autoSoupResponseTimeoutMs = 830;
     @Include public int autoSoupCycleCooldownMs = 330;
     @Include public int autoSoupHoldTimeoutMs = 2000;
@@ -238,6 +240,9 @@ public final class OrvenConfig extends Config {
         option(collected, "separateClickSides", "Separate left/right behavior", "Use Wren’s slower right-click rhythm. Turn off to use independent left-model rhythms for both buttons, with right CPS reduced by 10%.", Visualizer.SwitchVisualizer.class);
         option(collected, "profileCpsCeiling", "Target CPS ceiling", "Highest generated total-rate target. Manual clicks are never suppressed. Humble can briefly target 21–22 left CPS; these rare peaks extend beyond the sample.", Visualizer.SliderVisualizer.class);
         slider(collected, "profileCpsCeiling", 1.0f, 22.0f, 0.1f);
+        option(collected, "entityCpsFloorEnabled", "Try to maintain high CPS when targeting an entity", "After the initial 1.5-second ramp, keep the left-click target above the minimum while looking at a living entity. Applies to eligible physical boost and both spam modes; never bypasses filters or the CPS ceiling.", Visualizer.SwitchVisualizer.class);
+        option(collected, "entityCpsFloor", "Entity target minimum CPS", "Minimum total-rate target while looking at a living entity. Actual one-second counts can vary; physical clicks are never suppressed. Default: 8 CPS.", Visualizer.SliderVisualizer.class);
+        slider(collected, "entityCpsFloor", 1, 22, .1f);
         option(collected, "holdEnabled", "Enable button hold", "Latch Minecraft’s attack or use binding down until its toggle key is pressed again. Suppresses generated clicks on that side.", Visualizer.SwitchVisualizer.class);
         option(collected, "holdLeftBind", "Toggle left hold", "Press once to hold the attack binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
         option(collected, "holdRightBind", "Toggle right hold", "Press once to hold the use binding; press again to release it. Unassigned by default.", Visualizer.KeybindVisualizer.class);
@@ -276,7 +281,7 @@ public final class OrvenConfig extends Config {
                 "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY", "hitPopupPosition");
         leaves(root, collected, "ClickAssist", "Advanced", "advancedInfo");
         section(root, collected, "behavior", "Clicking behavior", "ClickAssist", "Advanced", null,
-                "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs");
+                "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs", "entityCpsFloorEnabled", "entityCpsFloor");
         section(root, collected, "assistWeapons", "Physical boost items", "ClickAssist", "Advanced", "weaponOnly", "assistItems", "assistAllowFist");
         section(root, collected, "spamWeapons", "Spam click button items", "ClickAssist", "Advanced", "spamWeaponOnly", "spamItems", "spamAllowFist");
         section(root, collected, "heldWeapons", "Mouse hold items", "ClickAssist", "Advanced", "heldClickWeaponOnly", "heldItems", "heldClickAllowFist");
@@ -284,6 +289,7 @@ public final class OrvenConfig extends Config {
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
         buildAutoTool(root, collected);
         buildAutoSoup(root, collected);
+        depends(collected, "entityCpsFloorEnabled", "entityCpsFloor");
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
         depends(collected, "spamWeaponOnly", "spamItems");
@@ -352,7 +358,7 @@ public final class OrvenConfig extends Config {
         option(collected, "autoSoupScoreboardWord", "Scoreboard matching text", "Match sidebar text ignoring case and colors. Default: mineberry.org. Also obeys General's global conditions.", Visualizer.TextVisualizer.class);
         String[] timings = {"autoSoupConsumeMinMs", "autoSoupConsumeMaxMs", "autoSoupReturnMinMs", "autoSoupReturnMaxMs", "autoSoupMoveMinMs", "autoSoupMoveMaxMs", "autoSoupResponseTimeoutMs", "autoSoupCycleCooldownMs", "autoSoupHoldTimeoutMs"};
         String[] titles = {"Minimum consume delay (ms)", "Maximum consume delay (ms)", "Minimum sword-return delay (ms)", "Maximum sword-return delay (ms)", "Minimum item-move delay (ms)", "Maximum item-move delay (ms)", "Server response timeout (ms)", "Cycle cooldown (ms)", "Maximum soup hold (ms)"};
-        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 110 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 135 ms.", "Minimum sampled wait after pressing right-click before switching back. Also wait for consumption or the maximum hold. Default: 113 ms.", "Maximum sampled minimum wait after pressing right-click. Consumption can require a longer hold. Default: 135 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 113 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 124 ms. Always recheck source and destination.", "Timeout for inventory refill responses and final consumption confirmation. The maximum soup hold controls how long right-click stays pressed.", "Pause between healing/refill cycles, including failed attempts. Default: 330 ms.", "Keep right-click pressed and the soup selected until it is consumed or this limit expires. Default: 2000 ms, allowing a complete food-use animation. Slot/count changes confirm consumption; health recovery also confirms when no item is still in use."};
+        String[] descriptions = {"Shortest wait after selecting a soup before using it. Default: 140 ms.", "Longest wait before using a selected soup. Sampled once per soup; default: 220 ms.", "Minimum sampled wait after pressing right-click before switching back. Also wait for consumption or the maximum hold. Default: 160 ms.", "Maximum sampled minimum wait after pressing right-click. Consumption can require a longer hold. Default: 260 ms. With no sword, restore the previous slot.", "Shortest wait between inventory swaps. Default: 150 ms. One item moves per action.", "Longest sampled wait between inventory swaps. Default: 230 ms. Always recheck source and destination.", "Timeout for inventory refill responses and final consumption confirmation. The maximum soup hold controls how long right-click stays pressed.", "Pause between healing/refill cycles, including failed attempts. Default: 330 ms.", "Keep right-click pressed and the soup selected until it is consumed or this limit expires. Default: 2000 ms, allowing a complete food-use animation. Slot/count changes confirm consumption; health recovery also confirms when no item is still in use."};
         for (int i = 0; i < timings.length; i++) {
             option(collected, timings[i], titles[i], descriptions[i], Visualizer.SliderVisualizer.class);
             slider(collected, timings[i], i == 6 || i == 8 ? 100 : 0, i == 8 ? 5000 : i == 6 ? 3000 : 1000, 1);
@@ -413,7 +419,15 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 8) return false;
+        if (configSchema >= 9) return false;
+        if (configSchema == 8) {
+            if (autoToolWhitelist != null) autoToolWhitelist = java.util.Arrays.stream(autoToolWhitelist)
+                    .filter(id -> id == null || !java.util.Set.of("glass", "stained_glass").contains(id.replace("minecraft:", ""))).toArray(String[]::new);
+            if (autoSoupConsumeMinMs == 110 && autoSoupConsumeMaxMs == 135) { autoSoupConsumeMinMs = 140; autoSoupConsumeMaxMs = 220; }
+            if (autoSoupReturnMinMs == 113 && autoSoupReturnMaxMs == 135) { autoSoupReturnMinMs = 160; autoSoupReturnMaxMs = 260; }
+            if (autoSoupMoveMinMs == 113 && autoSoupMoveMaxMs == 124) { autoSoupMoveMinMs = 150; autoSoupMoveMaxMs = 230; }
+            configSchema = 9; return true;
+        }
         if (configSchema == 7) {
             // Upgrade old presets while preserving deliberately customized ranges.
             if (autoSoupConsumeMinMs == 30 && autoSoupConsumeMaxMs == 55) { autoSoupConsumeMinMs = 110; autoSoupConsumeMaxMs = 135; }
@@ -421,7 +435,7 @@ public final class OrvenConfig extends Config {
             if (autoSoupMoveMinMs == 33 && autoSoupMoveMaxMs == 44) { autoSoupMoveMinMs = 113; autoSoupMoveMaxMs = 124; }
             if (autoSoupResponseTimeoutMs == 750) autoSoupResponseTimeoutMs = 830;
             if (autoSoupCycleCooldownMs == 250) autoSoupCycleCooldownMs = 330;
-            configSchema = 8; return true;
+            configSchema = 8; migrateValues(); return true;
         }
         if (configSchema == 6) {
             var updated = new java.util.LinkedHashSet<String>();

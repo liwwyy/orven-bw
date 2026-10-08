@@ -24,11 +24,12 @@ public final class FeatureRegistry {
     }
     private boolean syncContext(Minecraft client) {
         boolean global = io.github.liwwyy.orvenbw.OrvenBw.instance() == null || ScoreboardGate.allows(client, io.github.liwwyy.orvenbw.OrvenBw.instance().config());
-        boolean changed = world != client.world || player != client.player;
+        boolean worldChanged = world != client.world;
+        boolean changed = worldChanged || player != client.player;
         boolean ready = global && client.world != null && client.player != null && client.screen == null && client.focused && !client.isPaused();
         if (!ready || changed) {
             if (active || changed) for (ClientFeature f : features)
-                if (changed || !global || client.isPaused() || !f.ownsScreen(client)) f.reset();
+                if (changed || !global || client.isPaused() || !f.ownsScreen(client)) f.contextLost(worldChanged);
         }
         world = client.world;
         player = client.player;

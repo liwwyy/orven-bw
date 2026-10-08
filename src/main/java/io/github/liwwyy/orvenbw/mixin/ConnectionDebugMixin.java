@@ -17,7 +17,9 @@ public abstract class ConnectionDebugMixin {
     @Inject(method = "send(Lnet/minecraft/network/packet/Packet;)V", at = @At("HEAD"))
     private void orven$packet(Packet packet, CallbackInfo ci) {
         var mod = OrvenBw.instance();
-        if (mod == null || !mod.config().debugEnabled) return;
+        if (mod == null) return;
+        if (packet instanceof PlayerUseC2SPacket use) mod.esp().outgoing(use);
+        if (!mod.config().debugEnabled) return;
         String side, kind;
         if (packet instanceof PlayerInteractEntityC2SPacket interaction) {
             side = interaction.getAction() == PlayerInteractEntityC2SPacket.Action.ATTACK ? "left" : "right";

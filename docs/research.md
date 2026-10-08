@@ -215,3 +215,30 @@ ModConfigRoute. The existing General and ClickAssist page shortcuts are retained
 GitHub action versions were checked against their official release APIs; actionlint
 validates the build/release workflow. Release version/name come from gradle.properties,
 with x.x.x validation and tag/version agreement enforced before compiling.
+
+
+## ESP and Bedwars reference verification (0.7.1)
+
+- Raven-bS PlayerESP and Minigames/BedWars sources were inspected from the existing
+  `.reference/raven-Bs` checkout. All six rendering switches and the remaining public
+  settings are represented. Team-colour and Outline defaults intentionally differ from
+  Raven per the requested defaults. The BedWars loop omitted fireball-only activation;
+  this implementation processes that combination. Its placed-obsidian highlighting
+  was separate from held-item alerts; named bed-defence chat alerts are new here.
+- Axolotl's actual 1.8.9 WaypointRenderer uses projected screen markers for far targets,
+  fixed-scale world billboards nearby, optional edge projection and a five-block
+  distance-label cutoff. Behaviour was adapted using original rendering code:
+  https://codeberg.org/AxolotlClient/AxolotlClient-waypoints/src/branch/main/versions/1.8.9/src/main/java/io/github/axolotlclient/waypoints/waypoints/WaypointRenderer.java
+- OneConfig V1 MCP documentation does not describe the newer multi-select annotation.
+  DeepWiki was cross-checked against the actual installed 1.2.18 config-impl jar and
+  source: @MultiSelectDropdown supports boolean[] indexed by options, checkable=true;
+  @ItemList instead stores Minecraft registry item IDs. Native colour picking uses PolyColor.
+- Feather Gen 2 MCP confirmed GameRenderer.render(IFJ)V and Item.byBlock(Block).
+  Decompiled mapped Minecraft source and bytecode establish the hand-pass boundary,
+  player model hook, loaded-chunk accessor and network updates. Tests inspect bytes
+  without initializing Minecraft.
+- Hypixel forum observations document exceptions to universal colour ordering:
+  https://hypixel.net/threads/what-is-going-on-with-crogorm-the-order-of-teams-in-bedwars.5594945/
+  https://hypixel.net/threads/petition-for-hypixel-to-fix-the-order-of-team-colours-in-the-new-maps.2272340/
+  These are community reports, not an official map specification. No universal octagon,
+  opposing-pair rule or Pika/Hypixel shared geometry is assumed by the implementation.

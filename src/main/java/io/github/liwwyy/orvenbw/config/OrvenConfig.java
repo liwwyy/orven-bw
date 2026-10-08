@@ -12,6 +12,37 @@ import io.github.liwwyy.orvenbw.feature.clickassist.ClickProfileSession;
 /** Feature pages with native accordions and hidden persisted-field aliases. */
 public final class OrvenConfig extends Config {
     @Include public boolean modEnabled = false;
+    @Include public boolean playerEspEnabled = false;
+    @MultiSelectDropdown(title = "Render styles", description = "Combine any styles: silhouette outline, 2D bounds, wireframe box, feet ring, filled bounds and animated skeleton.", category = "ESP", subcategory = "Player ESP", options = {"2D", "Box", "Outline", "Ring", "Shaded", "Skeleton"})
+    public boolean[] espStyles = {false, false, true, false, false, false};
+    @Color(alpha = false, title = "Custom colour", description = "Fallback colour when no team colour is available. Rainbow can replace this fallback.", category = "ESP", subcategory = "Player ESP")
+    public org.polyfrost.compose.render.PolyColor espColor = org.polyfrost.compose.render.PolyColor.Companion.rgba(0, 255, 0, 255);
+    @Include public boolean espTeamColor = true;
+    @Include public boolean espRainbow = false;
+    @Include public boolean espHealthBar = true;
+    @Include public boolean espRedOnDamage = true;
+    @Include public boolean espRenderSelf = false;
+    @Include public boolean espShowInvisible = true;
+    @Include public boolean espIgnoreNpcs = true;
+    @Include public int espMaxDistance = 128;
+    @Include public boolean bedWaypointsEnabled = false;
+    @Include public boolean bedPredict = true;
+    @Include public boolean bedShowDistance = true;
+    @Include public boolean bedEdgeMarkers = true;
+    @Include public boolean bedObsidianMarkers = true;
+    @Include public float bedMarkerScale = 1.0f;
+    @Include public boolean bedAlertsEnabled = false;
+    @Include public boolean bedAlertArmor = true;
+    @Include public boolean bedAlertFireball = false;
+    @Include public boolean bedAlertPearl = true;
+    @Include public boolean bedAlertHeldObsidian = true;
+    @Include public boolean bedAlertPlacedObsidian = true;
+    @Include public boolean bedAlertHighlightObsidian = true;
+    @Include public boolean bedAlertSound = true;
+    @Include public boolean bedAlertIgnoreNpcs = true;
+    @Info(title = "Waypoint reliability", description = "Works most reliably with render distance 8 or higher on servers such as Hypixel and PikaNetwork. Unknown maps must be observed before their unseen beds can be predicted.", category = "ESP", subcategory = "Bed Waypoints")
+    public boolean bedReliabilityInfo;
+
     @Include public OneConfigKeybind settingsBind = KeybindHelper.builder().key(InputConstants.KEY_P).action((java.util.function.Consumer<Boolean>) down -> { if (down) openSettings(); }).build();
     @Include public boolean scoreboardOnly = false;
     @Include public String scoreboardWord = "Red";
@@ -190,6 +221,8 @@ public final class OrvenConfig extends Config {
     public void openAutoTool() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "AutoTool")); }
     @Button(title = "AutoSoup", text = "Open AutoSoup", icon = "assets/orvenbw/icons/soup.svg", description = "Configure automatic soup healing, hotbar refill and timing.")
     public void openAutoSoup() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "AutoSoup")); }
+    @Button(title = "ESP", text = "Open ESP", icon = "assets/orvenbw/icons/esp.svg", description = "Open player outlines, bed waypoints, obsidian defence markers and Bedwars alerts.")
+    public void openEsp() { OneConfigUI.open(new ModConfigRoute("orven-bw.json", "ESP")); }
     @Button(title = "Customize CPS HUD", text = "Open HUD editor", description = "Edit placement, colors, font, the CPS suffix and the dominant-side calculation.", category = "ClickAssist", subcategory = "HUD")
     public void editHud() { org.polyfrost.oneconfig.api.hud.v1.HudManager.INSTANCE.openEditor(); }
 
@@ -262,7 +295,7 @@ public final class OrvenConfig extends Config {
         option(collected, "showHud", "Show CPS HUD", "Show both left and right totals plus the dominant side’s base + boost calculation. Customize its appearance in the HUD editor.", Visualizer.SwitchVisualizer.class);
         collected.get("spamMode").addMetadata("options", new String[]{"Hold", "Toggle"});
         Tree root = Tree.tree("orven-bw.json");
-        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "openAutoTool", "openAutoSoup", "globalKeysInfo");
+        leaves(root, collected, "General", "General", "modEnabled", "openClickAssist", "openAutoTool", "openAutoSoup", "openEsp", "globalKeysInfo");
         section(root, collected, "globalKeys", "Keybinds", "General", "General", null, "settingsBind", "toggleModBind");
         leaves(root, collected, "General", "General", "conditionsInfo", "scoreboardOnly", "scoreboardWord");
         leaves(root, collected, "ClickAssist", "Physical CPS Boost", "enabled", "leftClick", "rightClick");
@@ -289,6 +322,7 @@ public final class OrvenConfig extends Config {
         section(root, collected, "hud", "CPS HUD", "ClickAssist", "HUD", "showHud", "editHud");
         buildAutoTool(root, collected);
         buildAutoSoup(root, collected);
+        buildEsp(root, collected);
         depends(collected, "entityCpsFloorEnabled", "entityCpsFloor");
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
@@ -315,6 +349,40 @@ public final class OrvenConfig extends Config {
             root.put(alias);
         }
         return root;
+    }
+    private static void buildEsp(Tree root, Tree collected) {
+        option(collected, "playerEspEnabled", "Enable Player ESP", "Highlight players using one or several render styles. Requires the global mod switch and conditions.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espTeamColor", "Team colours", "Use each player's current scoreboard-team or nametag colour. Unknown colours use the custom colour or rainbow.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espRainbow", "Rainbow fallback", "Cycle colours for players without a team colour, or for everyone when Team colours is off.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espHealthBar", "Health bars", "Draw a red-to-green health bar beside each player's bounds.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espRedOnDamage", "Red on damage", "Temporarily colour damaged players red while their hurt animation is active.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espRenderSelf", "Render yourself", "Include your player in third-person views. First-person rendering is excluded.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espShowInvisible", "Show invisible players", "Include invisible players in overlays and the silhouette outline pass.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espIgnoreNpcs", "Ignore NPCs", "Exclude players whose username is absent from the server tab list.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espMaxDistance", "Maximum distance (blocks)", "Do not render player overlays beyond this distance. Default: 128 blocks.", Visualizer.SliderVisualizer.class);
+        slider(collected, "espMaxDistance", 32, 256, 8);
+        option(collected, "bedWaypointsEnabled", "Enable Bed Waypoints", "Show see-through team initials anchored above beds in recognized Bedwars lobbies and matches.", Visualizer.SwitchVisualizer.class);
+        option(collected, "bedPredict", "Predict known map beds", "Recover unseen beds only from a uniquely matched, previously observed complete map. Predictions show a question mark until confirmed.", Visualizer.SwitchVisualizer.class);
+        option(collected, "bedShowDistance", "Show distance", "Display distance below bed labels; hide distance within five blocks.", Visualizer.SwitchVisualizer.class);
+        option(collected, "bedEdgeMarkers", "Screen-edge markers", "Keep off-screen beds visible at the screen edge. Markers move onto their world position as you approach.", Visualizer.SwitchVisualizer.class);
+        option(collected, "bedObsidianMarkers", "Obsidian defence markers", "Show a purple count below beds: six horizontal defence positions plus two above the bed. Unknown positions are marked with a question mark.", Visualizer.SwitchVisualizer.class);
+        option(collected, "bedMarkerScale", "Marker size", "Scale bed initials, distance labels and obsidian counters together.", Visualizer.SliderVisualizer.class);
+        slider(collected, "bedMarkerScale", .5f, 2, .1f);
+        option(collected, "bedAlertsEnabled", "Enable Bedwars Alerts", "Show local chat warnings during recognized Bedwars matches. NPC filtering and alert sounds are configurable below.", Visualizer.SwitchVisualizer.class);
+        String[] ids = {"bedAlertArmor", "bedAlertFireball", "bedAlertPearl", "bedAlertHeldObsidian", "bedAlertPlacedObsidian", "bedAlertHighlightObsidian", "bedAlertSound", "bedAlertIgnoreNpcs"};
+        String[] titles = {"Diamond armour", "Held fireball", "Held ender pearl", "Held obsidian", "Bed-defence obsidian", "Highlight placed obsidian", "Alert sound", "Ignore NPCs"};
+        String[] descriptions = {"Warn once per player per match when diamond leggings are observed.", "Warn when a player starts holding a fireball; includes their distance.", "Warn when a player starts holding an ender pearl; includes their distance.", "Warn when a player starts holding obsidian; includes their distance.", "Warn when a bed's observed obsidian defence count increases. Include the team only when its identity is confirmed.", "Outline obsidian touching a bed through blocks. Remove highlights when blocks disappear.", "Play a short pling with chat warnings.", "Ignore players whose username is absent from the server tab list."};
+        for (int j = 0; j < ids.length; j++) option(collected, ids[j], titles[j], descriptions[j], Visualizer.SwitchVisualizer.class);
+        leaves(root, collected, "ESP", "Player ESP", "playerEspEnabled");
+        section(root, collected, "espAppearance", "Appearance", "ESP", "Player ESP", null, "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage");
+        section(root, collected, "espFilters", "Filters", "ESP", "Player ESP", null, "espRenderSelf", "espShowInvisible", "espIgnoreNpcs", "espMaxDistance");
+        leaves(root, collected, "ESP", "Bed Waypoints", "bedWaypointsEnabled", "bedReliabilityInfo");
+        section(root, collected, "bedDisplay", "Display and discovery", "ESP", "Bed Waypoints", null, "bedPredict", "bedShowDistance", "bedEdgeMarkers", "bedMarkerScale", "bedObsidianMarkers");
+        leaves(root, collected, "ESP", "Alerts", "bedAlertsEnabled");
+        section(root, collected, "bedWarnings", "Warnings", "ESP", "Alerts", null, ids);
+        depends(collected, "playerEspEnabled", "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage", "espRenderSelf", "espShowInvisible", "espIgnoreNpcs", "espMaxDistance");
+        depends(collected, "bedWaypointsEnabled", "bedPredict", "bedShowDistance", "bedEdgeMarkers", "bedMarkerScale", "bedObsidianMarkers");
+        depends(collected, "bedAlertsEnabled", ids);
     }
     private static void buildAutoTool(Tree root, Tree collected) {
         option(collected, "autoToolEnabled", "Enable AutoTool", "Select the best mining tool from your hotbar for the block under the crosshair. Requires the global mod switch and conditions.", Visualizer.SwitchVisualizer.class);

@@ -8,5 +8,6 @@ public interface ClientFeature {
     default boolean ownsScreen(Minecraft client) { return false; }
     default void onInput(Minecraft client, int keyCode) {}
     default void beforeInteractions(Minecraft client) {}
+    default void contextLost(boolean worldChanged) { reset(); }
     default void reset() {}
 }

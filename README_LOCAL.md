@@ -329,7 +329,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.7.0**. The
+release (patch for fixes, minor for features). The current main version is **0.7.1**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
@@ -373,3 +373,44 @@ The 0.7.0 migration upgrades unchanged AutoSoup presets to consume 140–220 ms,
 sword-return minimum 160–260 ms, and item moves 150–230 ms. Each action samples its
 range independently. Custom ranges, the working keybinding hold and 2000 ms maximum
 hold stay as configured. Config schema is now 9.
+
+
+## 0.7.1 ESP and Bedwars overlays
+
+General includes an ESP shortcut. The ESP page has independent Player ESP, Bed Waypoints
+and Alerts switches, all off on upgrade/new install. Player ESP defaults to Outline,
+team colours and health bars. Its native OneConfig multi-select can combine 2D, Box,
+Outline, Ring, Shaded and Skeleton. Skeleton poses come from the player's actual model;
+outline shaders and framebuffers are allocated only when needed and released on shutdown.
+
+Waypoints are anchored at the bed centre above the supporting block. Far labels stay
+readable on screen, optionally at its edge; near labels become world-facing billboards.
+Bed initials use team colours (Green and Gray both use G). Predicted positions or cached
+colours awaiting current-match confirmation carry a question mark. Obsidian labels count
+the usual eight defence positions (six horizontal, two above): 4/8 means four confirmed
+obsidian blocks, while 4/8? means some positions are unloaded. Detection only uses blocks
+sent by the server; it cannot discover defence blocks hidden by server anti-xray.
+
+Server/map-specific complete observed layouts are cached in config/orven-bw/bed-layouts.json.
+One or two beds can identify a previously learned layout only if the match is unique and
+loaded blocks agree. Unknown maps need exploration first. An unavailable map name disables
+prediction rather than applying another map's geometry. Eight beds identify an eight-team
+layout, not solos versus doubles; four-team classification needs scoreboard rows. Waiting
+lobbies are recognized through Map: under a Bedwars title; team rows identify active play.
+Hypixel/Pika scoreboard formats and destruction announcements are parsed conservatively.
+Unsupported/localized scoreboards may require additional adapters.
+
+Current-match team attribution uses repeated, slow player observations within twelve
+blocks of a bed during the first fifteen seconds of play. The username must be in tab.
+Ambiguous assignments remain unknown; visitors cannot relabel an established team.
+Obsidian placement alerts use only current-match confirmed team identity. Menu opening
+and chunk unloading preserve match knowledge; bed removal creates a match-local tombstone.
+
+Alerts preserve Raven-bS's diamond-legging purchase warning, held fireball/pearl/obsidian
+warnings and sound control; fireball-only operation is fixed. Placed obsidian is outlined
+and defence increases generate local chat messages with known team names. No messages are
+sent to other players. Own-golem spawn bookkeeping observes vanilla outbound use actions.
+
+Validation uses pure tracking/projection tests, live OneConfig-tree tests and Minecraft
+class-file contract checks. No Minecraft client/server was started for this release;
+shader appearance and in-game server-format compatibility still need manual validation.

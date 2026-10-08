@@ -13,7 +13,14 @@
     "AutoToolInputMixin",
     "InteractionManagerAccessor",
     "HitEffectsStatusMixin",
-    "AutoSoupMixin"
+    "AutoSoupMixin",
+    "ClientChunksAccessor",
+    "EspWorldRenderMixin",
+    "EspPoseMixin",
+    "EspNameTagMixin",
+    "EspWorldUpdatesMixin",
+    "EspChunkUpdatesMixin",
+    "EspShutdownMixin"
   ],
   "injectors": {
     "defaultRequire": 1

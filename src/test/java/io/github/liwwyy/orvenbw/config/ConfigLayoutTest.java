@@ -31,7 +31,7 @@ class ConfigLayoutTest {
             categories.add(node.getMetadata("category"));
             if ("ClickAssist".equals(node.getMetadata("category"))) sections.add(node.getMetadata("subcategory"));
         }
-        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup"), java.util.List.copyOf(categories));
+        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup", "ESP"), java.util.List.copyOf(categories));
         assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "Advanced", "HUD"), java.util.List.copyOf(sections));
         for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind"}) {
             assertNotNull(tree.get(field).getMetadata("visualizer"), field);
@@ -62,6 +62,29 @@ class ConfigLayoutTest {
         assertEquals("Advanced", tree.get("assistWeapons").getMetadata("subcategory"));
         assertEquals("Advanced", tree.get("spamWeapons").getMetadata("subcategory"));
         assertEquals("Advanced", tree.get("heldWeapons").getMetadata("subcategory"));
+    }
+    @Test void espPageDefaultsMultiSelectAndHiddenDependenciesAreLive() {
+        var config = new OrvenConfig(); Tree tree = tree(config);
+        assertFalse(config.playerEspEnabled); assertFalse(config.bedWaypointsEnabled); assertFalse(config.bedAlertsEnabled);
+        assertTrue(config.espTeamColor); assertTrue(config.espHealthBar); assertEquals(128,config.espMaxDistance);
+        assertArrayEquals(new boolean[]{false,false,true,false,false,false},config.espStyles);
+        assertNotNull(getClass().getClassLoader().getResource("assets/orvenbw/icons/esp.svg"));
+        assertEquals("assets/orvenbw/icons/esp.svg",tree.get("openEsp").getMetadata("icon"));
+        assertEquals(Visualizer.MultiSelectDropdownVisualizer.class,tree.get("espAppearance","espStyles").getMetadata("visualizer"));
+        assertEquals(Visualizer.ColorVisualizer.class,tree.get("espAppearance","espColor").getMetadata("visualizer"));
+        assertEquals(Property.Display.HIDDEN,tree.getProp("espAppearance","espStyles").getDisplay());
+        tree.getProp("playerEspEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("espAppearance","espStyles").getDisplay());
+        tree.getProp("espAppearance","espStyles").setAs(new boolean[]{true,true,true,true,true,true});
+        assertTrue(config.espStyles[5]);
+        tree.getProp("playerEspEnabled").setAs(false);
+        assertEquals(Property.Display.HIDDEN,tree.getProp("espFilters","espMaxDistance").getDisplay());
+        tree.getProp("bedWaypointsEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("bedDisplay","bedObsidianMarkers").getDisplay());
+        tree.getProp("bedWaypointsEnabled").setAs(false);
+        assertEquals(Property.Display.HIDDEN,tree.getProp("bedDisplay","bedObsidianMarkers").getDisplay());
+        tree.getProp("bedAlertsEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("bedWarnings","bedAlertFireball").getDisplay());
     }
     @Test void profilesAreLiveAndLegacyTimingIsHidden() {
         var config = new OrvenConfig(); Tree tree = tree(config);

@@ -261,3 +261,24 @@ builds publish a new version with the runtime jar and checksum after successful 
 Existing releases are retained, so bump mod_version for each new release. Tags must
 match the version property. Pull requests only produce build artifacts.
 README.md is empty; project/build notes are now in README_LOCAL.md.
+
+
+## ESP, Bed Waypoints and Alerts — 0.7.1 (2026-10-08)
+
+- Built with `./gradlew clean build` using JDK 27, targeting Java 25. Follow-up edge-case
+  corrections were verified with `./gradlew build`.
+- Java coverage includes native ESP style/colour controls, hidden dependencies, all
+  bed orientations, unique defence slots, canonical foundation anchors, prediction
+  promotion/destruction, unloaded defence states, conflicting/current-match colour
+  evidence, persistent cache matching and alert transitions.
+- Class-file tests inspect the mapped Minecraft jar without class initialization.
+  They verify the exact world-render overload and unique `hand` boundary, player-model
+  hook, non-bridge name-tag method, loaded-chunk field, block updates, chunk/chat
+  handlers and shutdown method.
+- Python analysis/release/viewer tests (22) and the Node viewer checks passed.
+- The remapped runtime jar includes ESP classes, all seven new mixins and esp.svg,
+  and reports version 0.7.1+mc1.8.9. README.md remains empty.
+- No Minecraft instance, screenshot capture or GUI/input automation was used.
+  Actual shader rendering, labels and live Hypixel/Pika scoreboard compatibility
+  require user-led in-game validation. Unknown/localized scoreboards are not claimed
+  to be supported. Predicted positions require a complete previously observed map.

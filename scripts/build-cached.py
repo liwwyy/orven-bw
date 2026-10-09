@@ -104,7 +104,10 @@ with zipfile.ZipFile(dev, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(p, p.relative_to(main_out))
     for p in (ROOT / "src/main/resources").rglob("*"):
         if p.is_file():
-            z.writestr(str(p.relative_to(ROOT / "src/main/resources")), p.read_text().replace("${version}", version))
+            data = p.read_bytes()
+            if p.name == "fabric.mod.json":
+                data = data.replace(b"${version}", version.encode())
+            z.writestr(str(p.relative_to(ROOT / "src/main/resources")), data)
     z.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\nCalamus-Generation: 2\nFabric-Jar-Type: classes\nFabric-Loom-Mixin-Remap-Type: static\nFabric-Minecraft-Version: 1.8.9\nFabric-Mapping-Namespace: intermediary\n\n")
 mappings = CACHE / "fabric-loom/1.8.9/loom.mappings.1_8_9.layered+hash.1480139456-v2/mappings.tiny"
 if not mappings.exists():

@@ -24,24 +24,51 @@ final class EspOutline implements AutoCloseable {
     private static final String EDGE = """
             #version 120
             uniform sampler2D image;
+            uniform sampler2D sceneDepth;
+            uniform sampler2D entityDepth;
             uniform vec2 pixel;
+            uniform vec2 projectionDepth;
+            uniform bool occludedOnly;
+            float covered(vec2 uv) {
+                float a=texture2D(image,uv).a;
+                if(occludedOnly && texture2D(entityDepth,uv).r <= texture2D(sceneDepth,uv).r+0.00000012) a=0.0;
+                return a;
+            }
             void main() {
-                vec2 uv = gl_TexCoord[0].xy;
-                vec4 centre = texture2D(image, uv);
-                vec4 nearest = vec4(0.0);
-                for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++) {
-                    vec4 sampleColour = texture2D(image, uv + vec2(float(x), float(y)) * pixel);
-                    if (sampleColour.a > nearest.a) nearest = sampleColour;
+                vec2 uv=gl_TexCoord[0].xy;
+                float centre=covered(uv);
+                vec4 nearest=vec4(0.0);
+                for(int x=-2;x<=2;x++) for(int y=-2;y<=2;y++) {
+                    vec2 at=uv+vec2(float(x),float(y))*pixel;
+                    vec4 colour=texture2D(image,at);
+                    float depth=texture2D(entityDepth,at).r*2.0-1.0;
+                    float distance=abs(projectionDepth.y/(depth+projectionDepth.x));
+                    float radius=clamp(24.0/max(distance,1.0),0.35,2.0);
+                    float weight=clamp(radius+0.5-max(abs(float(x)),abs(float(y))),0.0,1.0);
+                    colour.a=covered(at)*weight;
+                    if(colour.a>nearest.a) nearest=colour;
                 }
-                gl_FragColor = vec4(nearest.rgb, nearest.a * (1.0 - centre.a));
+                gl_FragColor=vec4(nearest.rgb,nearest.a*(1.0-centre));
             }
             """;
+    private final EspDiagnostics diagnostics;
+    EspOutline(EspDiagnostics diagnostics) { this.diagnostics=diagnostics; }
     private RenderTarget target;
-    private int mask, edge;
-    private boolean failed;
+    private int mask, edge, sceneDepth, entityDepth;
+    private boolean failed, terrainReady;
+    private int terrainWidth,terrainHeight;
     static boolean drawing;
-    void render(Minecraft mc, float delta, List<PlayerEntity> players, ToIntFunction<PlayerEntity> color, boolean invisible) {
-        if (failed || drawing || players.isEmpty()) return;
+    void beginWorld() { terrainReady=false; }
+    void captureTerrain(Minecraft mc) {
+        if(failed || !GLX.useFbo() || !GLContext.getCapabilities().OpenGL20) return;
+        try(var ignored=new EspGlState()) {
+            if(sceneDepth==0) sceneDepth=GL11.glGenTextures();
+            copyDepth(sceneDepth,mc.width,mc.height);
+            terrainWidth=mc.width;terrainHeight=mc.height;terrainReady=true;
+        } catch(RuntimeException error) { fail(error); }
+    }
+    void render(Minecraft mc, float delta, List<PlayerEntity> players, ToIntFunction<PlayerEntity> color, boolean invisible, boolean occludedOnly, float[] projection) {
+        if (failed || drawing || players.isEmpty() || occludedOnly && (!terrainReady || terrainWidth!=mc.width || terrainHeight!=mc.height)) return;
         if (!GLX.useFbo() || !GLContext.getCapabilities().OpenGL20) { fail(new IllegalStateException("ESP Outline requires framebuffer and GLSL support")); return; }
         boolean shadows = mc.options.entityShadows, dispatcherShadow = mc.getEntityRenderDispatcher().shouldRenderShadow();
         int oldProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
@@ -53,9 +80,16 @@ final class EspOutline implements AutoCloseable {
                 if (target != null) target.destroyBuffers();
                 target = new RenderTarget(mc.width, mc.height, true); target.setClearColor(0,0,0,0);
             }
+            if(sceneDepth==0) sceneDepth=GL11.glGenTextures();
+            if(entityDepth==0) entityDepth=GL11.glGenTextures();
+            // RenderTarget construction/resizing unbinds to framebuffer zero. Restore the world
+            // framebuffer before taking its depth, including the first frame after a resize.
+            GLX.bindFramebuffer(GLX.GL_FRAMEBUFFER,framebuffer);
+            if(!occludedOnly) copyDepth(sceneDepth,mc.width,mc.height);
+            GlStateManager.depthMask(true); GlStateManager.colorMask(true,true,true,true);
             target.clear(); target.bindWrite(true);
             GlStateManager.disableFog(); GlStateManager.disableLighting(); GlStateManager.enableTexture();
-            GlStateManager.disableDepthTest(); GlStateManager.depthMask(false);
+            GlStateManager.enableDepthTest(); GlStateManager.depthFunc(GL11.GL_LEQUAL); GlStateManager.depthMask(true);
             GlStateManager.enableBlend(); GlStateManager.blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
             mc.options.entityShadows = false; mc.getEntityRenderDispatcher().setRenderShadow(false); drawing = true;
             GL20.glUseProgram(mask); GL20.glUniform1i(GL20.glGetUniformLocation(mask, "image"), 0);
@@ -69,20 +103,40 @@ final class EspOutline implements AutoCloseable {
                 } finally { if (hidden && invisible) player.setInvisible(true); }
             }
             drawing = false;
+            copyDepth(entityDepth,mc.width,mc.height);
             GLX.bindFramebuffer(GLX.GL_FRAMEBUFFER,framebuffer);
             GL20.glUseProgram(edge); GL20.glUniform1i(GL20.glGetUniformLocation(edge, "image"), 0);
             GL20.glUniform2f(GL20.glGetUniformLocation(edge, "pixel"), 1f / target.width, 1f / target.height);
+            GL20.glUniform1i(GL20.glGetUniformLocation(edge,"sceneDepth"),1);
+            GL20.glUniform1i(GL20.glGetUniformLocation(edge,"entityDepth"),2);
+            GL20.glUniform1i(GL20.glGetUniformLocation(edge,"occludedOnly"),occludedOnly?1:0);
+            GL20.glUniform2f(GL20.glGetUniformLocation(edge,"projectionDepth"),projection[10],projection[14]);
+            GlStateManager.activeTexture(GL13.GL_TEXTURE1); GlStateManager.bindTexture(sceneDepth);
+            GlStateManager.activeTexture(GL13.GL_TEXTURE2); GlStateManager.bindTexture(entityDepth);
+            GlStateManager.activeTexture(GL13.GL_TEXTURE0);
+            GlStateManager.disableDepthTest(); GlStateManager.depthMask(false);
             // RenderTarget.draw() establishes its own pixel-space matrices and texture coordinates.
             GlStateManager.enableBlend(); GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
             target.draw(mc.width, mc.height, false);
         } catch (RuntimeException error) { fail(error); }
         finally {
+            terrainReady=false;
             drawing = false; mc.options.entityShadows = shadows; mc.getEntityRenderDispatcher().setRenderShadow(dispatcherShadow);
             GL20.glUseProgram(oldProgram); GLX.bindFramebuffer(GLX.GL_FRAMEBUFFER,framebuffer);
         }
     }
+    private static void copyDepth(int texture,int width,int height) {
+        GlStateManager.activeTexture(GL13.GL_TEXTURE0); GlStateManager.bindTexture(texture);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_MIN_FILTER,GL11.GL_NEAREST);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_MAG_FILTER,GL11.GL_NEAREST);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_WRAP_S,GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_WRAP_T,GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL14.GL_TEXTURE_COMPARE_MODE,GL11.GL_NONE);
+        GL11.glCopyTexImage2D(GL11.GL_TEXTURE_2D,0,GL14.GL_DEPTH_COMPONENT32,0,0,width,height,0);
+    }
     private void fail(RuntimeException error) {
         if (!failed) OrvenBw.LOGGER.warn("Player ESP Outline unavailable; other render styles remain usable", error);
+        diagnostics.record("outline-failure",error.toString());
         failed = true; close();
     }
     private static int shader(int kind, String source) {
@@ -104,8 +158,11 @@ final class EspOutline implements AutoCloseable {
         finally { if (vertex != 0) GL20.glDeleteShader(vertex); if (frag != 0) GL20.glDeleteShader(frag); }
     }
     @Override public void close() {
+        terrainReady=false;
         if (target != null) { target.destroyBuffers(); target = null; }
         if (mask != 0) { GL20.glDeleteProgram(mask); mask = 0; }
+        if(sceneDepth!=0) { GL11.glDeleteTextures(sceneDepth); sceneDepth=0; }
+        if(entityDepth!=0) { GL11.glDeleteTextures(entityDepth); entityDepth=0; }
         if (edge != 0) { GL20.glDeleteProgram(edge); edge = 0; }
     }
 }

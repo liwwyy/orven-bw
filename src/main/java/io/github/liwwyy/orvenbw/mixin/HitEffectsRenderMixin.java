@@ -13,6 +13,6 @@ public abstract class HitEffectsRenderMixin {
     @Inject(method = "render", at = @At("TAIL"))
     private void orven$renderHitEffects(float tickDelta, CallbackInfo ci) {
         var mod = OrvenBw.instance();
-        if (mod != null) { mod.hitEffects().render(Minecraft.getInstance()); mod.esp().renderHud(Minecraft.getInstance()); }
+        if (mod != null) { mod.hitEffects().render(Minecraft.getInstance()); mod.esp().renderHud(Minecraft.getInstance()); mod.indicators().renderHud(Minecraft.getInstance()); }
     }
 }

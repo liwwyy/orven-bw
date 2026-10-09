@@ -17,9 +17,11 @@ import java.util.*;
 /** World primitives, animated skeletons, projected bounds and near/far waypoint rendering. */
 public final class EspRenderer implements AutoCloseable {
     private final OrvenConfig config;
-    private final EspOutline outline = new EspOutline();
+    private final EspOutline outline;
+    private final EspDiagnostics diagnostics;
     private final List<Bounds> bounds = new ArrayList<>();
     private final Map<Integer, Pose> poses = new HashMap<>();
+    private final Map<java.util.UUID,LinkedHashMap<String,net.minecraft.item.ItemStack>> observedItems=new HashMap<>();
     private float[] view, projection;
     private double cameraX, cameraY, cameraZ;
     private int width, height;
@@ -28,7 +30,11 @@ public final class EspRenderer implements AutoCloseable {
         static Rotation of(ModelPart p) { return new Rotation(p.x,p.y,p.z,p.rotationX,p.rotationY,p.rotationZ); }
     }
     private record Pose(Rotation head, Rotation body, Rotation leftArm, Rotation rightArm, Rotation leftLeg, Rotation rightLeg, int tick) {}
-    public EspRenderer(OrvenConfig config) { this.config = config; }
+    public EspRenderer(OrvenConfig config) {
+        this.config = config;
+        diagnostics=new EspDiagnostics(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("orven-bw/esp-debug.jsonl"),()->config.espDebug);
+        outline=new EspOutline(diagnostics);
+    }
     public static boolean drawingOutline() { return EspOutline.drawing; }
     public void capture(PlayerEntity player, PlayerModel model) {
         if (!config.modEnabled || !config.playerEspEnabled || !style(5) || EspOutline.drawing) return;
@@ -50,6 +56,10 @@ public final class EspRenderer implements AutoCloseable {
                 && (!config.espIgnoreNpcs || player == mc.player || EspPlayers.listed(mc, player))
                 && mc.getCamera().squaredDistanceTo(player) <= Math.pow(Math.clamp(config.espMaxDistance, 32, 256), 2);
     }
+    public void beginWorld() { outline.beginWorld(); }
+    public void captureTerrain(Minecraft mc) {
+        if(config.playerEspEnabled && style(2) && config.espOccludedOnly) outline.captureTerrain(mc);
+    }
     public void renderWorld(Minecraft mc, float delta, BedIndex beds, boolean bedwars) {
         clearFrame();
         Entity camera = mc.getCamera();
@@ -63,10 +73,26 @@ public final class EspRenderer implements AutoCloseable {
         FrustumCuller frustum = new FrustumCuller(); frustum.prepare(cameraX, cameraY, cameraZ);
         if (config.playerEspEnabled) for (PlayerEntity player : mc.world.players)
             if (eligible(mc, player) && frustum.isVisible(player.getShape())) players.add(player);
+        if(config.espShowHotbar) {
+            Set<java.util.UUID> present=new HashSet<>();
+            for(var player:mc.world.players) {
+                present.add(player.getUuid());
+                if(player==mc.player || !EspPlayers.listed(mc,player)) continue;
+                var item=player.getItemInHand();
+                if(item==null) continue;
+                var history=observedItems.computeIfAbsent(player.getUuid(),id->new LinkedHashMap<>());
+                String key=net.minecraft.item.Item.REGISTRY.getKey(item.getItem())+":"+item.getMetadata();
+                history.remove(key); history.put(key,item.copy());
+                while(history.size()>9) history.remove(history.keySet().iterator().next());
+            }
+            observedItems.keySet().retainAll(present);
+        } else observedItems.clear();
         poses.keySet().removeIf(id -> mc.world.getEntity(id) == null);
         try (var ignored = new EspGlState()) {
             overlayState();
             for (PlayerEntity player : players) {
+                if(config.espTeamColor && EspPlayers.color(player)<0) diagnostics.record("player-colour:"+player.getUuid(),"Using fallback colour for "+player.getName()+" team="+player.getScoreboardTeam()+" display="+player.getDisplayName());
+                if(config.espOccludedOnly && !PlayerVisibility.partlyHidden(mc,player)) continue;
                 int color = color(player);
                 double x = player.prevX + (player.x - player.prevX) * delta - cameraX;
                 double y = player.prevY + (player.y - player.prevY) * delta - cameraY;
@@ -79,10 +105,10 @@ public final class EspRenderer implements AutoCloseable {
                 if (style(4)) box(x1,y1,z1,x2,y2,z2,(color & 0xffffff) | 0x33000000,true);
                 if (style(3)) ring(x,y + .03,z,Math.max(.4, player.width * .8),color);
                 if (style(5)) skeleton(player,x,y,z,delta,color);
-                if (style(0) || config.espHealthBar) captureBounds(player,x1,y1,z1,x2,y2,z2,color);
+                if (style(0) || config.espHealthBar || config.espShowHotbar) captureBounds(player,x1,y1,z1,x2,y2,z2,color);
             }
             if (bedwars && config.bedWaypointsEnabled) for (var bed : beds.beds()) {
-                var p = project(bed.geometry.x() - cameraX, bed.geometry.y() + .7 - cameraY, bed.geometry.z() - cameraZ);
+                var p = project(bed.geometry.x() - cameraX, anchorY(bed) - cameraY, bed.geometry.z() - cameraZ);
                 if (p != null && p.front() && worldMarkerSize(bed) >= 1) waypointWorld(mc,bed);
             }
             if (bedwars && config.bedAlertsEnabled && config.bedAlertHighlightObsidian) for (var bed : beds.beds()) {
@@ -95,7 +121,7 @@ public final class EspRenderer implements AutoCloseable {
                     box(p.x()-cameraX,p.y()-cameraY,p.z()-cameraZ,p.x()+1-cameraX,p.y()+1-cameraY,p.z()+1-cameraZ,0xff6a0dad,false);
             }
         }
-        if (config.playerEspEnabled && style(2)) outline.render(mc,delta,players,this::color,config.espShowInvisible);
+        if (config.playerEspEnabled && style(2)) outline.render(mc,delta,players,this::color,config.espShowInvisible,config.espOccludedOnly,projection);
         else outline.close();
     }
     private void captureBounds(PlayerEntity player,double x1,double y1,double z1,double x2,double y2,double z2,int color) {
@@ -119,14 +145,39 @@ public final class EspRenderer implements AutoCloseable {
                 }
                 if (config.espHealthBar) {
                     double fraction = Math.clamp(b.player.getHealth() / Math.max(1,b.player.getMaxHealth()),0,1);
-                    GuiElement.fill((int)b.left-6,(int)b.top-1,(int)b.left-2,(int)b.bottom+1,0xdd000000);
-                    int rgb = java.awt.Color.HSBtoRGB((float)fraction / 3,1,1);
-                    GuiElement.fill((int)b.left-5,(int)(b.bottom-(b.bottom-b.top)*fraction),(int)b.left-3,(int)b.bottom,0xff000000 | rgb);
+                    double distance=mc.player.distanceTo(b.player);
+                    double barWidth=Math.clamp(20/Math.max(1,distance),1.25,3);
+                    double barHeight=(b.bottom-b.top)*.68;
+                    double top=(b.top+b.bottom-barHeight)/2, left=b.left-3-barWidth;
+                    int rgb=0xff000000 | java.awt.Color.HSBtoRGB((float)fraction/3,1,1);
+                    pill(left,top,barWidth,barHeight,0x60202020);
+                    if(fraction>0) pill(left,top+barHeight*(1-fraction),barWidth,barHeight*fraction,rgb);
                 }
+            }
+            if(config.espShowHotbar) for(var b:bounds) {
+                var items=observedItems.get(b.player.getUuid()); if(items==null||items.isEmpty()) continue;
+                double zoom=Math.clamp(16/Math.max(1,mc.player.distanceTo(b.player)),.45,.8);
+                GL11.glPushMatrix();
+                try {
+                    GL11.glTranslated((b.left+b.right)/2-items.size()*9*zoom,b.top-22*zoom,0); GL11.glScaled(zoom,zoom,1);
+                    GlStateManager.enableTexture(); GlStateManager.enableDepthTest();
+                    net.minecraft.client.render.platform.Lighting.turnOn();
+                    int x=0; for(var item:items.values()) { mc.getItemRenderer().renderGuiItem(item,x,0); x+=18; }
+                    net.minecraft.client.render.platform.Lighting.turnOff(); GlStateManager.disableDepthTest();
+                } finally { GL11.glPopMatrix(); }
             }
             if (!bedwars || !config.bedWaypointsEnabled) return;
             for (var bed : beds.beds()) {
-                var projected = project(bed.geometry.x()-cameraX,bed.geometry.y()+.7-cameraY,bed.geometry.z()-cameraZ);
+                if(config.bedObsidianMarkers && bed.obsidian>0) {
+                    var low=project(bed.geometry.x()-cameraX,bed.geometry.y()+.1-cameraY,bed.geometry.z()-cameraZ);
+                    if(low!=null && low.front() && low.x()>0 && low.x()<width && low.y()>0 && low.y()<height-16) {
+                        String text=bed.count(); int size=mc.textRenderer.getWidth(text);
+                        GlStateManager.enableTexture(); GlStateManager.enableBlend(); GlStateManager.disableDepthTest();
+                        GuiElement.fill((int)low.x()-size/2-3,(int)low.y()+12,(int)low.x()+size/2+3,(int)low.y()+25,0xdd300b47);
+                        mc.textRenderer.drawWithShadow(text,(float)low.x()-size/2f,(float)low.y()+14,0xffb56fe0);
+                    }
+                }
+                var projected = project(bed.geometry.x()-cameraX,anchorY(bed)-cameraY,bed.geometry.z()-cameraZ);
                 if (projected == null) continue;
                 boolean outside = !projected.front() || projected.x() < 16 || projected.x() > width-16 || projected.y() < 16 || projected.y() > height-30;
                 if (outside && !config.bedEdgeMarkers) continue;
@@ -141,9 +192,24 @@ public final class EspRenderer implements AutoCloseable {
             }
         }
     }
+    private double anchorY(BedIndex.Bed bed) {
+        double distance=Math.sqrt(bed.geometry.distanceSquared(cameraX,cameraY,cameraZ));
+        return bed.geometry.y()+BedWaypointAnchor.height(distance);
+    }
+    private static void pill(double x,double y,double w,double h,int color) {
+        if(h<=0) return;
+        double r=Math.min(w/2,h/2);
+        GlStateManager.disableTexture(); tint(color); GL11.glBegin(GL11.GL_TRIANGLE_FAN);
+        vertex(x+w/2,y+h/2,0);
+        for(int i=0;i<=32;i++) {
+            double angle=i*Math.PI/16, c=Math.cos(angle),s=Math.sin(angle);
+            vertex(x+w/2+c*r,y+(s>=0?h-r:r)+s*r,0);
+        }
+        GL11.glEnd(); GlStateManager.enableTexture();
+    }
     private float scale() { return Math.clamp(config.bedMarkerScale,.5f,2); }
     private double worldMarkerSize(BedIndex.Bed bed) {
-        double x = bed.geometry.x()-cameraX, y = bed.geometry.y()+.7-cameraY, z = bed.geometry.z()-cameraZ;
+        double x = bed.geometry.x()-cameraX, y = anchorY(bed)-cameraY, z = bed.geometry.z()-cameraZ;
         var p = project(x,y,z);
         // Project a camera-facing vertical segment to choose the exact near/far handoff.
         var upper = project(x + view[1]*.04*scale(),y + view[5]*.04*scale(),z + view[9]*.04*scale());
@@ -154,7 +220,7 @@ public final class EspRenderer implements AutoCloseable {
         var dispatcher = mc.getEntityRenderDispatcher();
         GL11.glPushMatrix();
         try {
-            GL11.glTranslated(bed.geometry.x()-cameraX,bed.geometry.y()+.7-cameraY,bed.geometry.z()-cameraZ);
+            GL11.glTranslated(bed.geometry.x()-cameraX,anchorY(bed)-cameraY,bed.geometry.z()-cameraZ);
             GL11.glRotatef(-dispatcher.cameraYaw,0,1,0);
             GL11.glRotatef(mc.options.perspective == 2 ? -dispatcher.cameraPitch : dispatcher.cameraPitch,1,0,0);
             GL11.glScalef(-.04f*scale(),-.04f*scale(),.04f*scale());
@@ -174,12 +240,8 @@ public final class EspRenderer implements AutoCloseable {
             String text = Math.round(distance) + "m";
             mc.textRenderer.drawWithShadow(text,-mc.textRenderer.getWidth(text)/2f,y,0xffeeeeee); y += 11;
         }
-        if (config.bedObsidianMarkers && bed.obsidian > 0) {
-            String text = bed.count(); int size = mc.textRenderer.getWidth(text);
-            GuiElement.fill(-size/2-3,y-2,size/2+3,y+10,0xdd300b47);
-            mc.textRenderer.drawWithShadow(text,-size/2f,y,0xffb56fe0);
-        }
     }
+
     private void skeleton(PlayerEntity player,double x,double y,double z,float delta,int color) {
         Pose pose = poses.get(player.getNetworkId());
         if (pose == null || Math.abs(player.ticks - pose.tick) > 2) return;
@@ -241,6 +303,6 @@ public final class EspRenderer implements AutoCloseable {
         GuiElement.fill((int)l,(int)t,(int)l+weight,(int)b,color); GuiElement.fill((int)r-weight,(int)t,(int)r,(int)b,color);
     }
     public void clearFrame() { bounds.clear(); view = projection = null; }
-    public void clearPlayers() { clearFrame(); poses.clear(); }
-    @Override public void close() { outline.close(); clearFrame(); poses.clear(); }
+    public void clearPlayers() { clearFrame(); poses.clear(); observedItems.clear(); }
+    @Override public void close() { outline.close(); clearFrame(); poses.clear(); observedItems.clear(); }
 }

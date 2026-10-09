@@ -1,0 +1,20 @@
+{
+  "warning1": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "orvenbw:warning1",
+        "stream": false
+      }
+    ]
+  },
+  "warning2": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "orvenbw:warning2",
+        "stream": false
+      }
+    ]
+  }
+}

@@ -20,7 +20,10 @@
     "EspNameTagMixin",
     "EspWorldUpdatesMixin",
     "EspChunkUpdatesMixin",
-    "EspShutdownMixin"
+    "EspShutdownMixin",
+    "ArrowEntityAccessor",
+    "AutoBlockNetworkMixin",
+    "AutoBlockAnimationMixin"
   ],
   "injectors": {
     "defaultRequire": 1

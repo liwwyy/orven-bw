@@ -91,6 +91,9 @@ public final class ClickAssistFeature implements ClientFeature {
         ItemStack heldStack = mc.player.getItemInHand();
         Item heldItem = heldStack == null ? null : heldStack.getItem();
         for (int button = 0; button <= 1; button++) {
+            if(button==1 && soupMod!=null && soupMod.autoBlock().ownsUse()) {
+                engine.cancel(button); sessions[button].reset(); heldTriggers[button].reset(); sources[button]=-1; profiles[button]=null; ownsHold[button]=false; continue;
+            }
             boolean leftFist = button == 0 && heldItem == null && config.heldClickAllowFist;
             var sideConditions = new HeldClickTrigger.Conditions(
                     conditions.available() && (button != 0 || heldItem != null || leftFist),

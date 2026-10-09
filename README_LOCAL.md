@@ -5,7 +5,7 @@ A modular Minecraft 1.8.9 client mod for Ornithe Gen 2 and OneConfig v1.
 
 ## Install and settings
 
-Install `build/libs/orven-bw-Ornithe-0.7.0+mc1.8.9.jar` in your OneClient instance's
+Install `build/libs/orven-bw-Ornithe-0.7.2+mc1.8.9.jar` in your OneClient instance's
 `minecraft/mods` folder. Do not install the sources jar. This build targets Java 25
 and the published OneConfig 1.2.18 SDK APIs.
 
@@ -329,7 +329,7 @@ JAVA_HOME=/usr/lib/jvm/java-27-temurin ./gradlew clean build
 ```
 
 The version lives in `gradle.properties` as `mod_version=x.x.x`. Bump it for each new
-release (patch for fixes, minor for features). The current main version is **0.7.1**. The
+release (patch for fixes, minor for features). The current main version is **0.7.2**. The
 runtime jar is `orven-bw-Ornithe-{version}+mc1.8.9.jar`; the mod metadata uses the same
 version with the Minecraft suffix. Sources jars are for development only.
 
@@ -414,3 +414,70 @@ sent to other players. Own-golem spawn bookkeeping observes vanilla outbound use
 Validation uses pure tracking/projection tests, live OneConfig-tree tests and Minecraft
 class-file contract checks. No Minecraft client/server was started for this release;
 shader appearance and in-game server-format compatibility still need manual validation.
+
+
+## 0.7.2 ESP fixes, AutoBlock and Indicators
+
+The populated-lobby crash in EspPlayers.color came from a null scoreboard team colour.
+Team, prefix and formatted-name resolution now tolerate absent colour data; both sidebar
+readers also tolerate it. A regression test exercises null and invalid colour values.
+The supplied icon.svg is registered with OneConfig and packaged as a 256px PNG for Fabric
+and launcher mod lists. README.md remains empty.
+
+Bedwars phase detection follows the requested scoreboard signals: Map: takes precedence
+as a waiting lobby, and a standalone Red word identifies a match without requiring a
+specific sidebar title. Team discovery still relies on observed, tab-listed players.
+Far bed initials sit six blocks above the supporting block and smoothly descend to its
+top between 48 and 6 blocks away. Distance is always measured to the bed, not the lifted
+label. Edge markers are off by default (including the one-time upgrade from schema 9).
+Obsidian counts are sampled after prediction rebuilding and drawn beneath the actual bed
+rather than beneath the lifted team label. Unknown defence slots retain the ? suffix.
+
+Player outlines sample opaque/cutout block depth captured before entities render, and a separately rendered player depth
+texture. Only highlight behind walls clips the silhouette per pixel, including partially
+covered players without treating other players as walls; other primitive styles and bars require at least one obstructed body
+ray when this option is active. The option is grey without Outline selected. Outline
+width falls from 2px nearby to a subpixel-weighted 1px edge at range. Health bars are
+shorter, borderless distance-scaled pills. Observed player hotbar items displays up to
+nine recently seen held item types, without armour. These are not known slot positions
+or a complete remote hotbar: Minecraft only sends a remote player's current held item.
+History resets on world changes or when the display is disabled.
+
+Held fireball warnings require at least one clear eye/body ray by default, with a toggle
+for the visibility check. Bow and stick holding and airborne arrow/fireball warnings have
+separate toggles. Embedded arrows are excluded, and flight warnings are deduplicated by
+entity ID until despawn. Alerts use Warning 1/2 from the supplied MP3 files, converted to
+mono 32kHz Ogg Vorbis, with metadata removed. The original audio files are not bundled.
+ESP debug logging is opt-in at the bottom of Advanced. It appends JSONL and matching
+console details to config/orven-bw/esp-debug.jsonl, throttles each diagnostic key to once
+per five seconds and bounds its throttle-key cache. It logs scoreboard phases, missing
+team colours/associations, unmatched layouts, per-slot obsidian samples and shader failures.
+
+ClickAssist now includes AutoBlock and Indicators before Advanced. Both start disabled.
+AutoBlock retains Raven-bS's range, hurt-time threshold, hold duration, lag chance/deadline,
+attack-delay prevention, immediate re-block, animation, physical mouse requirements,
+damaged-only and teammate-filter settings. Blocking uses vanilla KeyBinding.set/click;
+no interaction packet is constructed. Outbound lag temporarily queues existing vanilla
+play packets in order, never inbound traffic. Its deadline is measured from block start,
+with a wall-clock bound and 256-packet guard. Attacks flush first when configured. Reset,
+GUI/focus/world loss, disabled conditions and AutoSoup ownership release key/lag state.
+The forced block animation changes only the hand renderer's timer read. A configured
+Require right mouse option works independently; Raven's unconditional right-button guard
+would otherwise contradict its disabled default. External Raven modules are not required.
+
+Indicators retains arrows, pearls, fireballs, eggs and snowballs, their path toggles,
+three pointer shapes, radius, font, item colours/icons, distances, approaching-only and
+off-screen-only filters. Minecraft and OneConfig Poppins fonts are available. Approach
+uses Raven's one-block reduction over five ticks. Cached trajectories cover up to 120 ticks
+with four collision substeps, vanilla gravity/drag, water-flow acceleration, block and
+living-entity collisions and owner grace. Prediction stops at unloaded terrain. The 32
+nearest eligible trajectories are updated every five ticks to bound populated-lobby work;
+directional pointers still include all eligible projectiles. Paths include impact boxes
+and the arrow's rotating origin marker.
+
+Feature masters continue to hide their children. Controls are also grey when the global
+mod is off or a prerequisite (sound, held fireball, projectile type, damaged-only block,
+Outline style) is off. Live SDK-tree tests check the precedence and callbacks.
+Validation includes Java tests, Python/viewer checks, mapped class-file hook checks,
+offline GLSL validation and a remapped release build. No Minecraft process, screenshots,
+or input automation was used; visual appearance still requires manual in-game checking.

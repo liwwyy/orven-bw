@@ -28,7 +28,7 @@ public final class OrvenConfig extends Config {
     @Include public boolean bedWaypointsEnabled = false;
     @Include public boolean bedPredict = true;
     @Include public boolean bedShowDistance = true;
-    @Include public boolean bedEdgeMarkers = true;
+    @Include public boolean bedEdgeMarkers = false;
     @Include public boolean bedObsidianMarkers = true;
     @Include public float bedMarkerScale = 1.0f;
     @Include public boolean bedAlertsEnabled = false;
@@ -40,6 +40,46 @@ public final class OrvenConfig extends Config {
     @Include public boolean bedAlertHighlightObsidian = true;
     @Include public boolean bedAlertSound = true;
     @Include public boolean bedAlertIgnoreNpcs = true;
+    @Include public boolean espOccludedOnly = false;
+    @Include public boolean espShowHotbar = false;
+    @Include public boolean espDebug = false;
+    @Include public boolean bedAlertFireballVisible = true;
+    @Include public boolean bedAlertFlyingFireball = false;
+    @Include public boolean bedAlertBow = false;
+    @Include public boolean bedAlertArrow = false;
+    @Include public boolean bedAlertStick = false;
+    @Include public int bedWarningSound = 0;
+    @Include public boolean autoBlockEnabled = false;
+    @Include public double autoBlockRange = 4;
+    @Include public int autoBlockHurtMs = 200;
+    @Include public int autoBlockHoldMs = 150;
+    @Include public int autoBlockLagChance = 100;
+    @Include public int autoBlockLagMs = 200;
+    @Include public boolean autoBlockPreventAttackDelay = true;
+    @Include public boolean autoBlockAgain = true;
+    @Include public boolean autoBlockAnimation = true;
+    @Include public boolean autoBlockRequireLeft = true;
+    @Include public boolean autoBlockRequireRight = false;
+    @Include public boolean autoBlockDamagedOnly = false;
+    @Include public boolean autoBlockIgnoreTeam = true;
+    @Include public boolean indicatorsEnabled = false;
+    @Include public boolean indicatorArrows = true;
+    @Include public boolean indicatorPearls = true;
+    @Include public boolean indicatorFireballs = true;
+    @Include public boolean indicatorEggs = false;
+    @Include public boolean indicatorSnowballs = false;
+    @Include public boolean indicatorArrowPath = false;
+    @Include public boolean indicatorPearlPath = false;
+    @Include public boolean indicatorFireballPath = true;
+    @Include public int indicatorShape = 0;
+    @Include public int indicatorRadius = 50;
+    @Include public int indicatorFont = 0;
+    @Include public boolean indicatorColors = true;
+    @Include public boolean indicatorItems = true;
+    @Include public boolean indicatorDistance = true;
+    @Include public boolean indicatorApproaching = false;
+    @Include public boolean indicatorOffscreen = false;
+
     @Info(title = "Waypoint reliability", description = "Works most reliably with render distance 8 or higher on servers such as Hypixel and PikaNetwork. Unknown maps must be observed before their unseen beds can be predicted.", category = "ESP", subcategory = "Bed Waypoints")
     public boolean bedReliabilityInfo;
 
@@ -312,6 +352,7 @@ public final class OrvenConfig extends Config {
                 "hitEffectsShowHealth", "hitEffectsIgnoreNpcs");
         section(root, collected, "hitOptions", "Animation", "ClickAssist", "Hit effects", null,
                 "hitComboResetMs", "hitEffectDurationMs", "hitEffectOffsetY", "hitPopupPosition");
+        buildCombatExtras(root,collected);
         leaves(root, collected, "ClickAssist", "Advanced", "advancedInfo");
         section(root, collected, "behavior", "Clicking behavior", "ClickAssist", "Advanced", null,
                 "clickingProfile", "separateClickSides", "profileCpsCeiling", "boostDelayMs", "entityCpsFloorEnabled", "entityCpsFloor");
@@ -323,6 +364,7 @@ public final class OrvenConfig extends Config {
         buildAutoTool(root, collected);
         buildAutoSoup(root, collected);
         buildEsp(root, collected);
+        disableFeatureControlsWithGlobal(root,collected);
         depends(collected, "entityCpsFloorEnabled", "entityCpsFloor");
         depends(collected, "scoreboardOnly", "scoreboardWord");
         depends(collected, "weaponOnly", "assistItems");
@@ -350,12 +392,15 @@ public final class OrvenConfig extends Config {
         }
         return root;
     }
-    private static void buildEsp(Tree root, Tree collected) {
+    private void buildEsp(Tree root, Tree collected) {
         option(collected, "playerEspEnabled", "Enable Player ESP", "Highlight players using one or several render styles. Requires the global mod switch and conditions.", Visualizer.SwitchVisualizer.class);
         option(collected, "espTeamColor", "Team colours", "Use each player's current scoreboard-team or nametag colour. Unknown colours use the custom colour or rainbow.", Visualizer.SwitchVisualizer.class);
         option(collected, "espRainbow", "Rainbow fallback", "Cycle colours for players without a team colour, or for everyone when Team colours is off.", Visualizer.SwitchVisualizer.class);
-        option(collected, "espHealthBar", "Health bars", "Draw a red-to-green health bar beside each player's bounds.", Visualizer.SwitchVisualizer.class);
+        option(collected, "espHealthBar", "Health bars", "Draw a shorter, borderless pill bar that becomes smaller with distance.", Visualizer.SwitchVisualizer.class);
         option(collected, "espRedOnDamage", "Red on damage", "Temporarily colour damaged players red while their hurt animation is active.", Visualizer.SwitchVisualizer.class);
+        option(collected,"espOccludedOnly","Only highlight behind walls","Show only occluded silhouette pixels in Outline mode. Other styles and bars require a partially obstructed player.",Visualizer.SwitchVisualizer.class);
+        option(collected,"espShowHotbar","Observed player hotbar items","Show up to nine recently seen held items, without armour. Servers do not reveal remote hotbar slots; this is an observation history.",Visualizer.SwitchVisualizer.class);
+        option(collected,"espDebug","ESP debug logging","Append throttled detection/render diagnostics to config/orven-bw/esp-debug.jsonl and the console. Includes bed slots, scoreboard signals and team-assignment failures.",Visualizer.SwitchVisualizer.class);
         option(collected, "espRenderSelf", "Render yourself", "Include your player in third-person views. First-person rendering is excluded.", Visualizer.SwitchVisualizer.class);
         option(collected, "espShowInvisible", "Show invisible players", "Include invisible players in overlays and the silhouette outline pass.", Visualizer.SwitchVisualizer.class);
         option(collected, "espIgnoreNpcs", "Ignore NPCs", "Exclude players whose username is absent from the server tab list.", Visualizer.SwitchVisualizer.class);
@@ -369,20 +414,76 @@ public final class OrvenConfig extends Config {
         option(collected, "bedMarkerScale", "Marker size", "Scale bed initials, distance labels and obsidian counters together.", Visualizer.SliderVisualizer.class);
         slider(collected, "bedMarkerScale", .5f, 2, .1f);
         option(collected, "bedAlertsEnabled", "Enable Bedwars Alerts", "Show local chat warnings during recognized Bedwars matches. NPC filtering and alert sounds are configurable below.", Visualizer.SwitchVisualizer.class);
-        String[] ids = {"bedAlertArmor", "bedAlertFireball", "bedAlertPearl", "bedAlertHeldObsidian", "bedAlertPlacedObsidian", "bedAlertHighlightObsidian", "bedAlertSound", "bedAlertIgnoreNpcs"};
-        String[] titles = {"Diamond armour", "Held fireball", "Held ender pearl", "Held obsidian", "Bed-defence obsidian", "Highlight placed obsidian", "Alert sound", "Ignore NPCs"};
-        String[] descriptions = {"Warn once per player per match when diamond leggings are observed.", "Warn when a player starts holding a fireball; includes their distance.", "Warn when a player starts holding an ender pearl; includes their distance.", "Warn when a player starts holding obsidian; includes their distance.", "Warn when a bed's observed obsidian defence count increases. Include the team only when its identity is confirmed.", "Outline obsidian touching a bed through blocks. Remove highlights when blocks disappear.", "Play a short pling with chat warnings.", "Ignore players whose username is absent from the server tab list."};
+        String[] ids = {"bedAlertArmor", "bedAlertFireball", "bedAlertFireballVisible", "bedAlertFlyingFireball", "bedAlertBow", "bedAlertArrow", "bedAlertStick", "bedAlertPearl", "bedAlertHeldObsidian", "bedAlertPlacedObsidian", "bedAlertHighlightObsidian", "bedAlertSound", "bedAlertIgnoreNpcs"};
+        String[] titles = {"Diamond armour", "Held fireball", "Fireball holder: require line of sight", "Fireball in flight", "Held bow", "Arrow in flight", "Held stick", "Held ender pearl", "Held obsidian", "Bed-defence obsidian", "Highlight placed obsidian", "Alert sound", "Ignore NPCs"};
+        String[] descriptions = {"Warn once per player per match when diamond leggings are observed.", "Warn when a player starts holding a fireball; includes their distance.", "Warn only if at least one eye/body ray to the fireball holder is unobstructed by solid blocks. On by default.", "Warn once per newly observed fireball entity in flight.", "Warn when another player starts holding a bow.", "Warn once per airborne arrow; embedded arrows do not count.", "Warn when another player starts holding a stick.", "Warn when a player starts holding an ender pearl; includes their distance.", "Warn when a player starts holding obsidian; includes their distance.", "Warn when a bed's observed obsidian defence count increases. Include the team only when its identity is confirmed.", "Outline obsidian touching a bed through blocks. Remove highlights when blocks disappear.", "Play the custom warning sound selected below with chat warnings.", "Ignore players whose username is absent from the server tab list."};
         for (int j = 0; j < ids.length; j++) option(collected, ids[j], titles[j], descriptions[j], Visualizer.SwitchVisualizer.class);
+        option(collected,"bedWarningSound","Warning sound","Choose one of the two supplied warning sounds, converted to compact mono Ogg for Minecraft playback.",Visualizer.DropdownVisualizer.class);
+        collected.get("bedWarningSound").addMetadata("options",new String[]{"Warning 1","Warning 2"});
         leaves(root, collected, "ESP", "Player ESP", "playerEspEnabled");
-        section(root, collected, "espAppearance", "Appearance", "ESP", "Player ESP", null, "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage");
+        section(root, collected, "espAppearance", "Appearance", "ESP", "Player ESP", null, "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage", "espOccludedOnly", "espShowHotbar");
         section(root, collected, "espFilters", "Filters", "ESP", "Player ESP", null, "espRenderSelf", "espShowInvisible", "espIgnoreNpcs", "espMaxDistance");
         leaves(root, collected, "ESP", "Bed Waypoints", "bedWaypointsEnabled", "bedReliabilityInfo");
         section(root, collected, "bedDisplay", "Display and discovery", "ESP", "Bed Waypoints", null, "bedPredict", "bedShowDistance", "bedEdgeMarkers", "bedMarkerScale", "bedObsidianMarkers");
         leaves(root, collected, "ESP", "Alerts", "bedAlertsEnabled");
         section(root, collected, "bedWarnings", "Warnings", "ESP", "Alerts", null, ids);
-        depends(collected, "playerEspEnabled", "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage", "espRenderSelf", "espShowInvisible", "espIgnoreNpcs", "espMaxDistance");
+        depends(collected, "playerEspEnabled", "espStyles", "espTeamColor", "espColor", "espRainbow", "espHealthBar", "espRedOnDamage", "espOccludedOnly", "espShowHotbar", "espRenderSelf", "espShowInvisible", "espIgnoreNpcs", "espMaxDistance");
         depends(collected, "bedWaypointsEnabled", "bedPredict", "bedShowDistance", "bedEdgeMarkers", "bedMarkerScale", "bedObsidianMarkers");
+        leaves(root,collected,"ESP","Alerts","bedWarningSound");
+        leaves(root,collected,"ESP","Advanced","espDebug");
         depends(collected, "bedAlertsEnabled", ids);
+        depends(collected,"bedAlertsEnabled","bedWarningSound");
+        disable(collected,"bedAlertSound","bedWarningSound");
+        disable(collected,"bedAlertFireball","bedAlertFireballVisible");
+        var styles=collected.getProp("espStyles");
+        var occluded=collected.getProp("espOccludedOnly");
+        occluded.addDisplayCondition(() -> espStyles != null && espStyles.length > 2 && espStyles[2] ? Property.Display.SHOWN : Property.Display.DISABLED);
+        styles.addCallback(value -> { occluded.revaluateDisplay(); return false; });
+    }
+    private static void buildCombatExtras(Tree root,Tree collected) {
+        option(collected,"autoBlockEnabled","Enable AutoBlock","Hold and release your sword block against nearby players using vanilla keybindings. Includes Raven's timed outbound-lag options. Off by default.",Visualizer.SwitchVisualizer.class);
+        String[] ids={"autoBlockRange","autoBlockHurtMs","autoBlockHoldMs","autoBlockLagChance","autoBlockLagMs","autoBlockPreventAttackDelay","autoBlockAgain","autoBlockAnimation","autoBlockRequireLeft","autoBlockRequireRight","autoBlockDamagedOnly","autoBlockIgnoreTeam"};
+        String[] titles={"Target range","Maximum hurt time (ms)","Maximum block hold (ms)","Lag chance (%)","Maximum lag duration (ms)","Prevent delaying attacks","Block again immediately","Force block animation","Require left mouse","Require right mouse","Only when damaged","Ignore teammates"};
+        String[] descriptions={"Find a real, tab-listed player whose nearest hitbox point is within this many blocks of your eyes. Default: 4.","While damaged-only is enabled, begin blocking at this remaining hurt-animation time. Default: 200 ms.","Release the block after this duration. Timings round up to Minecraft ticks. Default: 150 ms.","Chance of briefly buffering vanilla outbound play packets after a block. Zero disables lag. Default: 100%.","Lag deadline measured from the start of the block, as in Raven. A hold already beyond this deadline does not start lag. Default: 200 ms.","Flush buffered packets before an attack so the attack is sent immediately.","Restart blocking after lag expires, or an attack releases lag, while the conditions still hold.","Keep the local sword block animation during outbound lag without changing server-side item-use state.","Run automatic block cycles only while physically holding your attack binding.","Run automatic block cycles only while physically holding your use binding. Manual right-only blocking stays available.","Start at the configured hurt-time threshold and release when a fresh damage animation begins.","Do not target a player on your scoreboard team or with the same effective nametag colour."};
+        for(int i=0;i<ids.length;i++) option(collected,ids[i],titles[i],descriptions[i],i<5?Visualizer.SliderVisualizer.class:Visualizer.SwitchVisualizer.class);
+        slider(collected,"autoBlockRange",2,6,.1f); slider(collected,"autoBlockHurtMs",50,500,50); slider(collected,"autoBlockHoldMs",50,500,50); slider(collected,"autoBlockLagChance",0,100,5); slider(collected,"autoBlockLagMs",50,500,50);
+        leaves(root,collected,"ClickAssist","AutoBlock","autoBlockEnabled");
+        section(root,collected,"autoBlockConditions","Conditions","ClickAssist","AutoBlock",null,"autoBlockRange","autoBlockRequireLeft","autoBlockRequireRight","autoBlockDamagedOnly","autoBlockIgnoreTeam");
+        section(root,collected,"autoBlockTiming","Blocking and lag","ClickAssist","AutoBlock",null,"autoBlockHurtMs","autoBlockHoldMs","autoBlockLagChance","autoBlockLagMs","autoBlockPreventAttackDelay","autoBlockAgain","autoBlockAnimation");
+        depends(collected,"autoBlockEnabled",ids); disable(collected,"autoBlockDamagedOnly","autoBlockHurtMs");
+        option(collected,"indicatorsEnabled","Enable Indicators","Show directional projectile pointers around the crosshair and optional predicted paths. Includes arrows, pearls, fireballs, eggs and snowballs.",Visualizer.SwitchVisualizer.class);
+        String[] projectiles={"indicatorArrows","indicatorPearls","indicatorFireballs","indicatorEggs","indicatorSnowballs","indicatorArrowPath","indicatorPearlPath","indicatorFireballPath"};
+        String[] names={"Arrows","Ender pearls","Fireballs","Eggs","Snowballs","Arrow trajectory","Pearl trajectory","Fireball trajectory"};
+        for(int i=0;i<projectiles.length;i++) option(collected,projectiles[i],names[i],i<5?"Include these airborne projectile entities in directional indicators.":"Draw the predicted flight path and impact location, including block/entity collisions. Prediction stops at unloaded terrain.",Visualizer.SwitchVisualizer.class);
+        option(collected,"indicatorShape","Pointer style","Choose Raven's caret, greater-than character or triangle pointer.",Visualizer.DropdownVisualizer.class);
+        collected.get("indicatorShape").addMetadata("options",new String[]{"Caret","Greater than","Triangle"});
+        option(collected,"indicatorFont","Font","Use the Minecraft or OneConfig HUD font for indicator text.",Visualizer.DropdownVisualizer.class);
+        collected.get("indicatorFont").addMetadata("options",new String[]{"Minecraft","OneConfig"});
+        option(collected,"indicatorRadius","Circle radius","Distance in GUI pixels from the crosshair to projectile pointers. Item icons add twenty pixels.",Visualizer.SliderVisualizer.class); slider(collected,"indicatorRadius",30,200,5);
+        String[] flags={"indicatorColors","indicatorItems","indicatorDistance","indicatorApproaching","indicatorOffscreen"};
+        String[] flagTitles={"Item colours","Show item icon","Show distance","Only when approaching","Only off-screen"};
+        String[] desc={"Colour pearls purple, fireballs orange, eggs pale yellow and other projectiles white.","Show a projectile's Minecraft item icon inside the pointer ring.","Show distance from your player beside each indicator.","Require the projectile to move at least one block closer over five ticks, matching Raven's approach filter.","Hide indicators for projectiles already inside the camera view."};
+        for(int i=0;i<flags.length;i++) option(collected,flags[i],flagTitles[i],desc[i],Visualizer.SwitchVisualizer.class);
+        leaves(root,collected,"ClickAssist","Indicators","indicatorsEnabled");
+        section(root,collected,"indicatorEntities","Entities and paths","ClickAssist","Indicators",null,projectiles);
+        section(root,collected,"indicatorAppearance","Appearance and filters","ClickAssist","Indicators",null,"indicatorShape","indicatorRadius","indicatorFont","indicatorColors","indicatorItems","indicatorDistance","indicatorApproaching","indicatorOffscreen");
+        depends(collected,"indicatorsEnabled",projectiles); depends(collected,"indicatorsEnabled",flags); depends(collected,"indicatorsEnabled","indicatorShape","indicatorRadius","indicatorFont");
+        disable(collected,"indicatorArrows","indicatorArrowPath"); disable(collected,"indicatorPearls","indicatorPearlPath"); disable(collected,"indicatorFireballs","indicatorFireballPath");
+    }
+    @SuppressWarnings("unchecked")
+    private static void disable(Tree collected,String toggle,String... fields) {
+        for(String field:fields) collected.getProp(field).addDisplayCondition((Property<Boolean>)collected.getProp(toggle),false);
+    }
+    @SuppressWarnings("unchecked")
+    private static void disableFeatureControlsWithGlobal(Tree root,Tree collected) {
+        var master=(Property<Boolean>)collected.getProp("modEnabled");
+        for(Node node:root.map.values()) {
+            if("General".equals(node.getMetadata("category"))) continue;
+            if(node instanceof Tree section) for(Node child:section.map.values()) {
+                if(child instanceof Property<?> property) property.addDisplayCondition(master,false);
+            }
+            else if(node instanceof Property<?> property) property.addDisplayCondition(master,false);
+        }
     }
     private static void buildAutoTool(Tree root, Tree collected) {
         option(collected, "autoToolEnabled", "Enable AutoTool", "Select the best mining tool from your hotbar for the block under the crosshair. Requires the global mod switch and conditions.", Visualizer.SwitchVisualizer.class);
@@ -487,14 +588,15 @@ public final class OrvenConfig extends Config {
     @Override protected void initialize(boolean byManager) { super.initialize(byManager); migrate(); }
     public void migrate() { if (migrateValues()) save(); }
     boolean migrateValues() {
-        if (configSchema >= 9) return false;
+        if (configSchema >= 10) return false;
+        if (configSchema == 9) { bedEdgeMarkers=false; configSchema=10; return true; }
         if (configSchema == 8) {
             if (autoToolWhitelist != null) autoToolWhitelist = java.util.Arrays.stream(autoToolWhitelist)
                     .filter(id -> id == null || !java.util.Set.of("glass", "stained_glass").contains(id.replace("minecraft:", ""))).toArray(String[]::new);
             if (autoSoupConsumeMinMs == 110 && autoSoupConsumeMaxMs == 135) { autoSoupConsumeMinMs = 140; autoSoupConsumeMaxMs = 220; }
             if (autoSoupReturnMinMs == 113 && autoSoupReturnMaxMs == 135) { autoSoupReturnMinMs = 160; autoSoupReturnMaxMs = 260; }
             if (autoSoupMoveMinMs == 113 && autoSoupMoveMaxMs == 124) { autoSoupMoveMinMs = 150; autoSoupMoveMaxMs = 230; }
-            configSchema = 9; return true;
+            configSchema = 9; migrateValues(); return true;
         }
         if (configSchema == 7) {
             // Upgrade old presets while preserving deliberately customized ranges.
@@ -591,5 +693,5 @@ public final class OrvenConfig extends Config {
         var mod = io.github.liwwyy.orvenbw.OrvenBw.instance();
         if (mod != null) mod.clickAssist().activation(action, down);
     }
-    public OrvenConfig() { super("orven-bw.json", "orven-bw", Category.UTILITY); }
+    public OrvenConfig() { super("orven-bw.json", "assets/orvenbw/icons/icon.svg", "orven-bw", Category.UTILITY); }
 }

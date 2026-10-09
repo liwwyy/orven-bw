@@ -26,6 +26,8 @@ public final class EspFeature implements ClientFeature {
     private final EspRenderer renderer;
     private final BedIndex index = new BedIndex();
     private final AlertTracker alerts = new AlertTracker();
+    private final Set<Integer> flyingAlerts = new HashSet<>();
+    private final EspDiagnostics diagnostics;
     private final BedLayoutCache cache;
     private final Map<Long, WorldChunk> scanned = new HashMap<>();
     private final ArrayDeque<Scan> scans = new ArrayDeque<>();
@@ -44,6 +46,7 @@ public final class EspFeature implements ClientFeature {
     private record Egg(double x, double y, double z, int tick) {}
     public EspFeature(OrvenConfig config) {
         this.config = config;
+        diagnostics=new EspDiagnostics(FabricLoader.getInstance().getConfigDir().resolve("orven-bw/esp-debug.jsonl"),()->config.espDebug);
         cache = new BedLayoutCache(FabricLoader.getInstance().getConfigDir().resolve("orven-bw/bed-layouts.json"));
         renderer = new EspRenderer(config);
     }
@@ -55,10 +58,11 @@ public final class EspFeature implements ClientFeature {
         if (world != mc.world) { reset(); world = mc.world; }
         allowed = mc.world != null && mc.player != null && ScoreboardGate.allows(mc, config);
         if (!allowed) { if (phase != BedwarsSidebar.Phase.NONE) clearMatch(); renderer.clearPlayers(); return; }
-        if (!config.bedAlertsEnabled && wasAlerts) alerts.clear();
+        if (!config.bedAlertsEnabled && wasAlerts) { alerts.clear(); flyingAlerts.clear(); }
         wasAlerts = config.bedAlertsEnabled;
         if (!config.bedWaypointsEnabled && !config.bedAlertsEnabled) { clearMatch(); return; }
         var sidebar = BedwarsSidebar.parse(sidebar(mc));
+        diagnostics.record("scoreboard","phase="+sidebar.phase()+" lines="+sidebar(mc));
         if (sidebar.phase() == BedwarsSidebar.Phase.NONE) { clearMatch(); return; }
         if ((phase == BedwarsSidebar.Phase.MATCH && sidebar.phase() == BedwarsSidebar.Phase.LOBBY)
                 || !sidebar.map().isEmpty() && !map.isEmpty() && !map.equals(sidebar.map())) clearMatch();
@@ -67,18 +71,18 @@ public final class EspFeature implements ClientFeature {
         if (!sidebar.map().isEmpty()) map = sidebar.map();
         server = mc.getCurrentServerEntry() == null ? "local" : mc.getCurrentServerEntry().ip.toLowerCase(Locale.ROOT);
         if (sidebar.teams() != 0) teamCount = sidebar.teams();
-        for (BedTeam team : sidebar.destroyed()) index.broken(team);
+        if(inMatch()) for (BedTeam team : sidebar.destroyed()) index.broken(team);
         if (ticks % 10 == 0) discover(mc);
         scan(mc, 16384); // At most four non-empty sections per tick, never full-world scans per frame.
         if (ticks % 4 == 0) {
             validateBeds(mc);
             if (phase == BedwarsSidebar.Phase.MATCH && ticks - matchStart <= 300) associateTeams(mc);
-            index.updateDefence(p -> sample(mc, p));
             if (teamCount == 0 && index.confirmedCount() == 8) teamCount = 8;
             cache.learn(server, map, teamCount, index);
             if (config.bedPredict) {
                 var layout = cache.match(server, map, teamCount, index.beds()).filter(l -> l.beds().stream().allMatch(e ->
                         index.isDestroyed(e.geometry(), e.team()) || compatible(mc,e.geometry())));
+                if(layout.isEmpty()) diagnostics.record("layout-unmatched","No unique compatible cached layout: server="+server+" map="+map+" teamCount="+teamCount+" confirmedBeds="+index.confirmedCount()+" loadedChunks="+scanned.size());
                 index.discardPredictions();
                 layout.ifPresent(l -> { for (var entry : l.beds()) {
                     var observed = index.beds().stream().filter(b -> b.geometry.equals(entry.geometry())).findFirst();
@@ -88,8 +92,14 @@ public final class EspFeature implements ClientFeature {
                 }});
                 validateBeds(mc);
             } else index.discardPredictions();
+            index.updateDefence(p -> sample(mc,p));
+            for(var bed:index.beds()) {
+                if(!bed.teamObserved) diagnostics.record("team:"+bed.geometry.foot(),"No confirmed spawn/team association: team="+bed.team+" confirmed="+bed.confirmed+" votes require slow tab-listed players near the bed during the first 15 seconds");
+                diagnostics.record("defence:"+bed.geometry.foot(),"bed="+bed.geometry+" obsidian="+bed.count()+" samples="+bed.geometry.defence().stream().map(p->p+":"+sample(mc,p)).toList());
+            }
             if (config.bedAlertsEnabled && inMatch()) {
                 playerAlerts(mc);
+                projectileAlerts(mc);
                 if (config.bedAlertPlacedObsidian) for (var bed : index.beds())
                     if (bed.confirmed && alerts.defence(bed)) {
                         BedTeam team = bed.teamObserved ? bed.team : BedTeam.UNKNOWN;
@@ -102,7 +112,7 @@ public final class EspFeature implements ClientFeature {
     private static List<String> sidebar(Minecraft mc) {
         var board = mc.world.getScoreboard();
         var team = board.getTeamOfMember(mc.player.getName());
-        var objective = team == null || team.getColor().getId() < 0 ? null : board.getDisplayObjective(3 + team.getColor().getId());
+        var objective = team == null || team.getColor() == null || team.getColor().getId() < 0 ? null : board.getDisplayObjective(3 + team.getColor().getId());
         if (objective == null) objective = board.getDisplayObjective(1);
         if (objective == null) return List.of();
         List<String> result = new ArrayList<>(); result.add(objective.getDisplayName());
@@ -189,7 +199,7 @@ public final class EspFeature implements ClientFeature {
         for (PlayerEntity player : mc.world.players) {
             if (!player.isAlive() || player.isSpectator() || !EspPlayers.listed(mc, player)) continue;
             BedTeam team = BedTeam.fromColor(EspPlayers.color(player));
-            if (team == BedTeam.UNKNOWN) continue;
+            if (team == BedTeam.UNKNOWN) { diagnostics.record("team-colour:"+player.getName(),"No usable team/nametag colour; player="+player.getName()+" team="+player.getScoreboardTeam()); continue; }
             // Only slow, early spawn observations near a base. A rushing opponent cannot relabel a bed.
             if (Math.hypot(player.x - player.prevX, player.z - player.prevZ) > .35) continue;
             var nearby = index.beds().stream().filter(b -> b.confirmed && Math.abs(player.y - b.geometry.y()) < 5)
@@ -213,14 +223,25 @@ public final class EspFeature implements ClientFeature {
             ItemStack hand = player.getItemInHand();
             Item item = hand == null ? null : hand.getItem();
             String type = item == Items.ENDER_PEARL ? "Ender Pearl" : item == Items.FIRE_CHARGE ? "Fireball"
-                    : item == Item.byBlock(Blocks.OBSIDIAN) ? "Obsidian" : null;
-            boolean selected = type != null && switch (type) { case "Ender Pearl" -> config.bedAlertPearl; case "Fireball" -> config.bedAlertFireball; default -> config.bedAlertHeldObsidian; };
+                    : item == Items.BOW ? "Bow" : item == Items.STICK ? "Stick" : item == Item.byBlock(Blocks.OBSIDIAN) ? "Obsidian" : null;
+            boolean selected = type != null && switch (type) { case "Ender Pearl" -> config.bedAlertPearl; case "Fireball" -> config.bedAlertFireball && (!config.bedAlertFireballVisible || PlayerVisibility.visible(mc,player)); case "Bow" -> config.bedAlertBow; case "Stick" -> config.bedAlertStick; default -> config.bedAlertHeldObsidian; };
             if (alerts.held(name, selected ? type : null)) alert(mc, display + "§r is holding §e" + type + "§r (" + Math.round(player.distanceTo(mc.player)) + "m).");
         }
     }
+    private void projectileAlerts(Minecraft mc) {
+        Set<Integer> alive=new HashSet<>();
+        for(var entity:mc.world.getEntities()) {
+            boolean fireball=entity instanceof net.minecraft.entity.projectile.FireballEntity || entity instanceof net.minecraft.entity.projectile.SmallFireballEntity;
+            boolean arrow=entity instanceof net.minecraft.entity.projectile.ArrowEntity && !((io.github.liwwyy.orvenbw.mixin.ArrowEntityAccessor)entity).orven$inGround();
+            if(!fireball&&!arrow) continue;
+            alive.add(entity.getNetworkId());
+            if((fireball?config.bedAlertFlyingFireball:config.bedAlertArrow) && flyingAlerts.add(entity.getNetworkId())) alert(mc,"§e"+(fireball?"Fireball":"Arrow")+"§r in flight ("+Math.round(entity.distanceTo(mc.player))+"m).");
+        }
+        flyingAlerts.retainAll(alive);
+    }
     private void alert(Minecraft mc, String message) {
         mc.gui.getChat().addMessage(new LiteralText("§8[§borven-bw§8] §r" + message));
-        if (config.bedAlertSound) mc.player.playSound("note.pling", 1, 1);
+        if (config.bedAlertSound) mc.getSoundManager().play(net.minecraft.client.sound.instance.SimpleSoundInstance.of(new net.minecraft.resource.Identifier("orvenbw:warning"+(config.bedWarningSound==1?2:1))));
     }
     public void chat(String message) {
         if (allowed && inMatch()) index.broken(BedDestructionMessage.parse(message));
@@ -241,6 +262,9 @@ public final class EspFeature implements ClientFeature {
         }
     }
     public boolean isOwnGolem(int networkId) { return ownGolems.contains(networkId); }
+    public void captureTerrain(Minecraft mc) {
+        if(allowed && mc.world==world && ScoreboardGate.allows(mc,config) && mc.screen==null && !mc.options.hideGui && !mc.isPaused()) renderer.captureTerrain(mc);
+    }
     public void renderWorld(Minecraft mc, float delta) {
         if (allowed && mc.world == world && ScoreboardGate.allows(mc,config) && mc.screen == null && !mc.options.hideGui && !mc.isPaused()) renderer.renderWorld(mc, delta, index, phase != BedwarsSidebar.Phase.NONE);
         else renderer.clearFrame();
@@ -248,7 +272,7 @@ public final class EspFeature implements ClientFeature {
     public void renderHud(Minecraft mc) {
         if (allowed && mc.world == world && ScoreboardGate.allows(mc,config) && mc.screen == null && !mc.options.hideGui && !mc.isPaused()) renderer.renderHud(mc, index, phase != BedwarsSidebar.Phase.NONE);
     }
-    private void clearMatch() { index.clear(); alerts.clear(); scanned.clear(); scans.clear(); queued.clear(); eggs.clear(); ownGolems.clear(); map = ""; teamCount = 0; phase = BedwarsSidebar.Phase.NONE; }
+    private void clearMatch() { index.clear(); alerts.clear(); flyingAlerts.clear(); scanned.clear(); scans.clear(); queued.clear(); eggs.clear(); ownGolems.clear(); map = ""; teamCount = 0; phase = BedwarsSidebar.Phase.NONE; }
     @Override public void contextLost(boolean worldChanged) { renderer.clearFrame(); if (worldChanged) reset(); }
     @Override public void reset() { clearMatch(); renderer.clearPlayers(); allowed = false; }
     public void close() { renderer.close(); }

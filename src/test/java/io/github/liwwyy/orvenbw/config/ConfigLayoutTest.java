@@ -7,9 +7,9 @@ import org.polyfrost.oneconfig.internal.ui.search.SettingIndexKt;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigLayoutTest {
-    private Tree tree(OrvenConfig config) { return config.makeTree(); }
+    private Tree tree(OrvenConfig config) { config.modEnabled=true; return config.makeTree(); }
     @Test void generalComesFirstWithVisibleEnableAndIconShortcut() {
-        var config = new OrvenConfig(); Tree tree = tree(config);
+        var config = new OrvenConfig(); Tree tree = config.makeTree();
         assertFalse(config.modEnabled);
         assertEquals("modEnabled", tree.map.keySet().iterator().next());
         assertEquals("Enable orven-bw", tree.get("modEnabled").getTitle());
@@ -32,7 +32,7 @@ class ConfigLayoutTest {
             if ("ClickAssist".equals(node.getMetadata("category"))) sections.add(node.getMetadata("subcategory"));
         }
         assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup", "ESP"), java.util.List.copyOf(categories));
-        assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "Advanced", "HUD"), java.util.List.copyOf(sections));
+        assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "AutoBlock", "Indicators", "Advanced", "HUD"), java.util.List.copyOf(sections));
         for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind"}) {
             assertNotNull(tree.get(field).getMetadata("visualizer"), field);
             assertNull(tree.get(field).getMetadata("hidden"), field);
@@ -86,6 +86,42 @@ class ConfigLayoutTest {
         tree.getProp("bedAlertsEnabled").setAs(true);
         assertEquals(Property.Display.SHOWN,tree.getProp("bedWarnings","bedAlertFireball").getDisplay());
     }
+    @Test void globalDisableGreysControlsWhileFeatureMastersKeepHidingTheirChildren() {
+        var config=new OrvenConfig(); var tree=config.makeTree();
+        assertEquals(Property.Display.DISABLED,tree.getProp("playerEspEnabled").getDisplay());
+        assertEquals(Property.Display.HIDDEN,tree.getProp("espAppearance","espShowHotbar").getDisplay());
+        tree.getProp("playerEspEnabled").setAs(true);
+        assertEquals(Property.Display.DISABLED,tree.getProp("espAppearance","espShowHotbar").getDisplay());
+        tree.getProp("modEnabled").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("espAppearance","espShowHotbar").getDisplay());
+        tree.getProp("espAppearance","espStyles").setAs(new boolean[]{true,false,false,false,false,false});
+        assertEquals(Property.Display.DISABLED,tree.getProp("espAppearance","espOccludedOnly").getDisplay());
+        tree.getProp("espAppearance","espStyles").setAs(new boolean[]{false,false,true,false,false,false});
+        assertEquals(Property.Display.SHOWN,tree.getProp("espAppearance","espOccludedOnly").getDisplay());
+        tree.getProp("bedAlertsEnabled").setAs(true);
+        assertEquals(Property.Display.DISABLED,tree.getProp("bedWarnings","bedAlertFireballVisible").getDisplay());
+        tree.getProp("bedWarnings","bedAlertFireball").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("bedWarnings","bedAlertFireballVisible").getDisplay());
+        tree.getProp("bedWarnings","bedAlertSound").setAs(false);
+        assertEquals(Property.Display.DISABLED,tree.getProp("bedWarningSound").getDisplay());
+        tree.getProp("bedAlertsEnabled").setAs(false);
+        assertEquals(Property.Display.HIDDEN,tree.getProp("bedWarningSound").getDisplay());
+        assertFalse(config.bedEdgeMarkers);assertFalse(config.espDebug);assertTrue(config.bedAlertFireballVisible);
+    }
+    @Test void autoblockAndIndicatorsRetainRavenDefaultsAndLiveDependencies() {
+        var config=new OrvenConfig();var tree=tree(config);
+        assertFalse(config.autoBlockEnabled);assertFalse(config.indicatorsEnabled);
+        assertEquals(4,config.autoBlockRange);assertEquals(200,config.autoBlockHurtMs);assertEquals(150,config.autoBlockHoldMs);assertEquals(100,config.autoBlockLagChance);assertEquals(200,config.autoBlockLagMs);
+        assertTrue(config.autoBlockPreventAttackDelay&&config.autoBlockAgain&&config.autoBlockAnimation&&config.autoBlockRequireLeft&&config.autoBlockIgnoreTeam);assertFalse(config.autoBlockRequireRight||config.autoBlockDamagedOnly);
+        assertTrue(config.indicatorArrows&&config.indicatorPearls&&config.indicatorFireballs&&config.indicatorFireballPath);assertFalse(config.indicatorEggs||config.indicatorSnowballs||config.indicatorArrowPath||config.indicatorPearlPath);
+        tree.getProp("autoBlockEnabled").setAs(true);
+        assertEquals(Property.Display.DISABLED,tree.getProp("autoBlockTiming","autoBlockHurtMs").getDisplay());
+        tree.getProp("autoBlockConditions","autoBlockDamagedOnly").setAs(true);
+        assertEquals(Property.Display.SHOWN,tree.getProp("autoBlockTiming","autoBlockHurtMs").getDisplay());
+        tree.getProp("indicatorsEnabled").setAs(true);
+        tree.getProp("indicatorEntities","indicatorFireballs").setAs(false);
+        assertEquals(Property.Display.DISABLED,tree.getProp("indicatorEntities","indicatorFireballPath").getDisplay());
+    }
     @Test void profilesAreLiveAndLegacyTimingIsHidden() {
         var config = new OrvenConfig(); Tree tree = tree(config);
         assertEquals(0, config.clickingProfile); assertTrue(config.separateClickSides);
@@ -108,7 +144,7 @@ class ConfigLayoutTest {
         config.spamEnabled = true; config.spamButton = 1;
         config.spamMediumCps = 11.3; config.spamRampMs = 600;
         config.spamRequiresPlayer = true; config.spamSwords = false;
-        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(10, config.configSchema);
         assertEquals(11.3, config.mediumCps); assertEquals(600, config.rampMs);
         assertTrue(config.spamRequiresPlayer); assertFalse(config.spamSwords);
         assertArrayEquals(config.spamBind.getMouseBtns(), config.spamRightBind.getMouseBtns());
@@ -217,7 +253,7 @@ class ConfigLayoutTest {
         tree.getProp("autoSoupRefill").setAs(false);
         assertEquals(Property.Display.HIDDEN, tree.getProp("autoSoupRefillTiming", "autoSoupMoveMinMs").getDisplay());
         config.configSchema = 6; config.autoToolWhitelist = new String[]{"minecraft:planks", "minecraft:chest", "trapped_chest", "minecraft:ender_chest", "test:custom"};
-        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(10, config.configSchema);
         assertArrayEquals(new String[]{"minecraft:planks", "test:custom", "minecraft:end_stone"}, config.autoToolWhitelist);
         assertFalse(config.migrateValues());
     }
@@ -227,7 +263,7 @@ class ConfigLayoutTest {
         config.autoSoupReturnMinMs = 33; config.autoSoupReturnMaxMs = 55;
         config.autoSoupMoveMinMs = 33; config.autoSoupMoveMaxMs = 44;
         config.autoSoupResponseTimeoutMs = 750; config.autoSoupCycleCooldownMs = 250;
-        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(10, config.configSchema);
         assertEquals(140, config.autoSoupConsumeMinMs); assertEquals(220, config.autoSoupConsumeMaxMs);
         assertEquals(160, config.autoSoupReturnMinMs); assertEquals(260, config.autoSoupReturnMaxMs);
         assertEquals(150, config.autoSoupMoveMinMs); assertEquals(230, config.autoSoupMoveMaxMs);
@@ -249,7 +285,7 @@ class ConfigLayoutTest {
         config.autoSoupConsumeMinMs = 110; config.autoSoupConsumeMaxMs = 135;
         config.autoSoupReturnMinMs = 113; config.autoSoupReturnMaxMs = 135;
         config.autoSoupMoveMinMs = 113; config.autoSoupMoveMaxMs = 124;
-        assertTrue(config.migrateValues()); assertEquals(9, config.configSchema);
+        assertTrue(config.migrateValues()); assertEquals(10, config.configSchema);
         assertArrayEquals(new String[]{"test:glass", "minecraft:wool"}, config.autoToolWhitelist);
         assertEquals(140, config.autoSoupConsumeMinMs); assertEquals(220, config.autoSoupConsumeMaxMs);
         assertEquals(160, config.autoSoupReturnMinMs); assertEquals(260, config.autoSoupReturnMaxMs);

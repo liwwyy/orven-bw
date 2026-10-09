@@ -9,6 +9,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class EspShutdownMixin {
     @Inject(method = "shutdown", at = @At("HEAD"))
     private void orven$closeEsp(CallbackInfo ci) {
-        var mod = OrvenBw.instance(); if (mod != null && Display.isCreated()) mod.esp().close();
+        var mod = OrvenBw.instance(); if (mod != null && Display.isCreated()) { mod.autoBlock().reset(); mod.esp().close(); mod.indicators().close(); }
     }
 }

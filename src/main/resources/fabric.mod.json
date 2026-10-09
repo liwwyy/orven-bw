@@ -4,15 +4,24 @@
   "version": "${version}",
   "name": "orven-bw",
   "description": "Bedwars/PvP utils to lower your cortisol!",
-  "authors": ["liwwyy"],
+  "authors": [
+    "liwwyy"
+  ],
   "environment": "client",
-  "entrypoints": {"client": ["io.github.liwwyy.orvenbw.OrvenBw"]},
-  "mixins": ["orven-bw.mixins.json"],
+  "entrypoints": {
+    "client": [
+      "io.github.liwwyy.orvenbw.OrvenBw"
+    ]
+  },
+  "mixins": [
+    "orven-bw.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "1.8.9",
     "java": ">=25",
     "oneconfigv1": ">=1.2.18",
     "fabric-language-kotlin": ">=1.14.1+kotlin.2.4.20"
-  }
+  },
+  "icon": "assets/orvenbw/icons/icon.png"
 }

@@ -10,7 +10,6 @@ public record BedwarsSidebar(Phase phase, String map, int teams, Set<BedTeam> de
     public static String clean(String line) { return line == null ? "" : line.replaceAll("(?i)§[0-9A-FK-OR]", "").trim(); }
     public static BedwarsSidebar parse(List<String> raw) {
         List<String> lines = raw.stream().map(BedwarsSidebar::clean).toList();
-        boolean bedwars = lines.stream().anyMatch(l -> l.toLowerCase(Locale.ROOT).replace(" ", "").contains("bedwars"));
         boolean pika = lines.stream().anyMatch(l -> l.toLowerCase(Locale.ROOT).contains("pika"));
         String map = ""; Set<BedTeam> found = EnumSet.noneOf(BedTeam.class), broken = EnumSet.noneOf(BedTeam.class);
         for (String line : lines) {
@@ -23,8 +22,9 @@ public record BedwarsSidebar(Phase phase, String map, int teams, Set<BedTeam> de
                         || status.matches("\\d+(?:\\s+.*)?") || status.toLowerCase(Locale.ROOT).startsWith("eliminated")) broken.add(team);
             }
         }
-        // Team rows override Map: because some servers keep the map name during play.
-        Phase phase = bedwars && found.size() >= 2 ? Phase.MATCH : bedwars && !map.isEmpty() ? Phase.LOBBY : Phase.NONE;
+        // Explicit requested signals: Map: means waiting; red means an active game.
+        boolean red = lines.stream().anyMatch(l -> Pattern.compile("(?i)\\bred\\b").matcher(l).find());
+        Phase phase = lines.stream().anyMatch(l->l.toLowerCase(Locale.ROOT).contains("map:")) ? Phase.LOBBY : red ? Phase.MATCH : Phase.NONE;
         int teams = found.size() == 8 ? 8 : found.size() == 4 ? 4 : 0;
         return new BedwarsSidebar(phase, map, teams, Set.copyOf(broken), pika ? "pika" : "hypixel-compatible");
     }

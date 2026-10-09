@@ -11,16 +11,23 @@ public final class EspPlayers {
                 .anyMatch(info -> player.getName().equalsIgnoreCase(info.getProfile().getName()));
     }
     public static int color(PlayerEntity player) {
-        if (player.getScoreboardTeam() instanceof Team team) {
-            int prefix = formattingColor(team.getPrefix());
-            if (prefix >= 0) return prefix;
-            if (team.getColor().getId() >= 0) return palette(team.getColor().getId());
-        }
-        String display = player.getDisplayName().getFormattedString();
-        int name = display.indexOf(player.getName());
-        return formattingColor(name >= 0 ? display.substring(0,name) : display);
+        if (player == null) return -1;
+        Team team = player.getScoreboardTeam() instanceof Team t ? t : null;
+        var formatting = team == null ? null : team.getColor();
+        var display = player.getDisplayName();
+        return resolveColor(team == null ? null : team.getPrefix(), formatting == null ? null : formatting.getId(),
+                display == null ? null : display.getFormattedString(), player.getName());
+    }
+    public static int resolveColor(String prefix, Integer id, String display, String name) {
+        int color = formattingColor(prefix);
+        if (color >= 0) return color;
+        if (id != null && id >= 0) return palette(id);
+        if (display == null) return -1;
+        int start = name == null ? -1 : display.indexOf(name);
+        return formattingColor(start >= 0 ? display.substring(0,start) : display);
     }
     public static int formattingColor(String text) {
+        if (text == null) return -1;
         int found = -1;
         // Effective colour at the end of the prefix: rank brackets may have their own colour.
         for (int i = 0; i + 1 < text.length(); i++) {

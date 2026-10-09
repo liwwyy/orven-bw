@@ -16,7 +16,9 @@ public final class OrvenBw implements ClientModInitializer {
     private final FeatureRegistry features = new FeatureRegistry();
     private OrvenConfig config;
     private ClickAssistFeature clickAssist;
+    private io.github.liwwyy.orvenbw.feature.autoblock.AutoBlockFeature autoBlock;
     private io.github.liwwyy.orvenbw.feature.esp.EspFeature esp;
+    private io.github.liwwyy.orvenbw.feature.esp.IndicatorsFeature indicators;
     private HitEffectsFeature hitEffects;
     private io.github.liwwyy.orvenbw.feature.autotool.AutoToolFeature autoTool;
     private io.github.liwwyy.orvenbw.feature.autosoup.AutoSoupFeature autoSoup;
@@ -33,6 +35,8 @@ public final class OrvenBw implements ClientModInitializer {
         clickOrigins = new io.github.liwwyy.orvenbw.debug.ClickOriginTracker(debugLog);
         Runtime.getRuntime().addShutdownHook(new Thread(debugLog::close, "orven-bw-debug-shutdown"));
         clickAssist = new ClickAssistFeature(config);
+        autoBlock=new io.github.liwwyy.orvenbw.feature.autoblock.AutoBlockFeature(config);
+        features.register(autoBlock);
         features.register(clickAssist);
         hitEffects = new HitEffectsFeature(config);
         features.register(hitEffects);
@@ -42,6 +46,8 @@ public final class OrvenBw implements ClientModInitializer {
         features.register(autoSoup);
         esp = new io.github.liwwyy.orvenbw.feature.esp.EspFeature(config);
         features.register(esp);
+        indicators=new io.github.liwwyy.orvenbw.feature.esp.IndicatorsFeature(config);
+        features.register(indicators);
         org.polyfrost.oneconfig.api.config.v1.ConfigManager.addProfileChangeListener(name -> { features.reset(); config.migrate(); });
         instance = this;
         org.polyfrost.oneconfig.api.ui.v1.keybind.KeybindManager.register(config.settingsBind);
@@ -58,6 +64,8 @@ public final class OrvenBw implements ClientModInitializer {
     public io.github.liwwyy.orvenbw.debug.ClickOriginTracker clickOrigins() { return clickOrigins; }
     public static OrvenBw instance() { return instance; }
     public io.github.liwwyy.orvenbw.feature.esp.EspFeature esp() { return esp; }
+    public io.github.liwwyy.orvenbw.feature.autoblock.AutoBlockFeature autoBlock() { return autoBlock; }
+    public io.github.liwwyy.orvenbw.feature.esp.IndicatorsFeature indicators() { return indicators; }
     public FeatureRegistry features() { return features; }
     public OrvenConfig config() { return config; }
     public HitEffectsFeature hitEffects() { return hitEffects; }

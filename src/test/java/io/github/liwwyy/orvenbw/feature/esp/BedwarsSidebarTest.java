@@ -3,13 +3,15 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 class BedwarsSidebarTest {
-    @Test void lobbyUsesMapAndMatchRowsOverrideIt() {
+    @Test void mapOverridesMatchRowsAndTitlesAreNotRequired() {
         var lobby = BedwarsSidebar.parse(List.of("§eBED WARS","§fMap: §aLighthouse","Waiting..."));
         assertEquals(BedwarsSidebar.Phase.LOBBY,lobby.phase()); assertEquals("Lighthouse",lobby.map());
         var match = BedwarsSidebar.parse(List.of("BED WARS","Map: Lighthouse","R Red: ✔","B Blue: 2","G Green: ✘","Y Yellow: ✔"));
-        assertEquals(BedwarsSidebar.Phase.MATCH,match.phase()); assertEquals(4,match.teams());
+        assertEquals(BedwarsSidebar.Phase.LOBBY,match.phase()); assertEquals(4,match.teams());
         assertEquals(java.util.Set.of(BedTeam.BLUE,BedTeam.GREEN),match.destroyed());
-        assertEquals(BedwarsSidebar.Phase.NONE,BedwarsSidebar.parse(List.of("SKYWARS","Map: Tribute")).phase());
+        assertEquals(BedwarsSidebar.Phase.LOBBY,BedwarsSidebar.parse(List.of("CUSTOM SERVER","Map: Tribute")).phase());
+        assertEquals(BedwarsSidebar.Phase.MATCH,BedwarsSidebar.parse(List.of("Custom title","R Red: ✔")).phase());
+        assertEquals(BedwarsSidebar.Phase.NONE,BedwarsSidebar.parse(List.of("Coloured lobby")).phase());
     }
     @Test void pikaFullNamesAndEightTeamRowsAreRecognizedWithoutGuessingSoloVersusDoubles() {
         var match = BedwarsSidebar.parse(List.of("BEDWARS","play.pika-network.net","Red: ✔","Blue: ✔","Green: ✔","Yellow: ✔","Aqua: ✔","White: ✔","Pink: ✔","Gray: x"));

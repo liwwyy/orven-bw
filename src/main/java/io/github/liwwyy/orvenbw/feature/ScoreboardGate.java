@@ -21,7 +21,7 @@ public final class ScoreboardGate {
         var board = mc.world.getScoreboard();
         ScoreboardObjective objective = null;
         Team team = board.getTeamOfMember(mc.player.getName());
-        if (team != null && team.getColor().getId() >= 0) objective = board.getDisplayObjective(3 + team.getColor().getId());
+        if (team != null && team.getColor() != null && team.getColor().getId() >= 0) objective = board.getDisplayObjective(3 + team.getColor().getId());
         if (objective == null) objective = board.getDisplayObjective(1);
         if (objective == null) return false;
         List<String> visible = new ArrayList<>();

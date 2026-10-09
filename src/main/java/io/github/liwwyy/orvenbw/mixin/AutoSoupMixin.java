@@ -31,6 +31,6 @@ public abstract class AutoSoupMixin {
     @Inject(method = "doUse", at = @At("HEAD"), cancellable = true)
     private void orven$protectSoupUse(CallbackInfo ci) {
         var mod = OrvenBw.instance();
-        if (mod != null && mod.autoSoup().busy() && !mod.autoSoup().protectsUse((Minecraft) (Object) this)) ci.cancel();
+        if (mod != null && (mod.autoBlock().blockVanillaUse() || mod.autoSoup().busy() && !mod.autoSoup().protectsUse((Minecraft) (Object) this))) ci.cancel();
     }
 }

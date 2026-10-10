@@ -29,6 +29,7 @@ final class EspOutline implements AutoCloseable {
             uniform vec2 pixel;
             uniform vec2 projectionDepth;
             uniform bool occludedOnly;
+            uniform float borderWidth;
             float covered(vec2 uv) {
                 float a=texture2D(image,uv).a;
                 if(occludedOnly && texture2D(entityDepth,uv).r <= texture2D(sceneDepth,uv).r+0.00000012) a=0.0;
@@ -38,12 +39,13 @@ final class EspOutline implements AutoCloseable {
                 vec2 uv=gl_TexCoord[0].xy;
                 float centre=covered(uv);
                 vec4 nearest=vec4(0.0);
-                for(int x=-2;x<=2;x++) for(int y=-2;y<=2;y++) {
+                for(int x=-6;x<=6;x++) for(int y=-6;y<=6;y++) {
+                    if(max(abs(float(x)),abs(float(y)))>ceil(borderWidth)) continue;
                     vec2 at=uv+vec2(float(x),float(y))*pixel;
                     vec4 colour=texture2D(image,at);
                     float depth=texture2D(entityDepth,at).r*2.0-1.0;
                     float distance=abs(projectionDepth.y/(depth+projectionDepth.x));
-                    float radius=clamp(24.0/max(distance,1.0),0.35,2.0);
+                    float radius=clamp(borderWidth*12.0/max(distance,1.0),0.35,borderWidth);
                     float weight=clamp(radius+0.5-max(abs(float(x)),abs(float(y))),0.0,1.0);
                     colour.a=covered(at)*weight;
                     if(colour.a>nearest.a) nearest=colour;
@@ -67,7 +69,7 @@ final class EspOutline implements AutoCloseable {
             terrainWidth=mc.width;terrainHeight=mc.height;terrainReady=true;
         } catch(RuntimeException error) { fail(error); }
     }
-    void render(Minecraft mc, float delta, List<PlayerEntity> players, ToIntFunction<PlayerEntity> color, boolean invisible, boolean occludedOnly, float[] projection) {
+    void render(Minecraft mc, float delta, List<PlayerEntity> players, ToIntFunction<PlayerEntity> color, boolean invisible, boolean occludedOnly, float[] projection, float width) {
         if (failed || drawing || players.isEmpty() || occludedOnly && (!terrainReady || terrainWidth!=mc.width || terrainHeight!=mc.height)) return;
         if (!GLX.useFbo() || !GLContext.getCapabilities().OpenGL20) { fail(new IllegalStateException("ESP Outline requires framebuffer and GLSL support")); return; }
         boolean shadows = mc.options.entityShadows, dispatcherShadow = mc.getEntityRenderDispatcher().shouldRenderShadow();
@@ -110,6 +112,7 @@ final class EspOutline implements AutoCloseable {
             GL20.glUniform1i(GL20.glGetUniformLocation(edge,"sceneDepth"),1);
             GL20.glUniform1i(GL20.glGetUniformLocation(edge,"entityDepth"),2);
             GL20.glUniform1i(GL20.glGetUniformLocation(edge,"occludedOnly"),occludedOnly?1:0);
+            GL20.glUniform1f(GL20.glGetUniformLocation(edge,"borderWidth"),Math.clamp(width,1,6));
             GL20.glUniform2f(GL20.glGetUniformLocation(edge,"projectionDepth"),projection[10],projection[14]);
             GlStateManager.activeTexture(GL13.GL_TEXTURE1); GlStateManager.bindTexture(sceneDepth);
             GlStateManager.activeTexture(GL13.GL_TEXTURE2); GlStateManager.bindTexture(entityDepth);

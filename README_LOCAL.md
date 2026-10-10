@@ -481,3 +481,57 @@ Outline style) is off. Live SDK-tree tests check the precedence and callbacks.
 Validation includes Java tests, Python/viewer checks, mapped class-file hook checks,
 offline GLSL validation and a remapped release build. No Minecraft process, screenshots,
 or input automation was used; visual appearance still requires manual in-game checking.
+
+
+## 0.7.3
+
+Bed team assignments now come exclusively from waiting-lobby wool. `Map:` marks
+scouting; a sidebar containing `Red` without `Map:` marks the match. The closest
+wool to the bed midpoint within the configurable spherical radius (16 blocks by
+default) supplies the team colour. Equally near different wool colours stay
+unassigned, including different shades of the same team; ESP debug records the
+conflict. Unloaded closer terrain also prevents guessing. Search work is budgeted
+and retried as chunks load. Previous map inference and persistent layout files
+are no longer used.
+
+Leaving the lobby starts a 1.5-second transfer deadline. One exact matching bed
+(both halves and facing) validates all scouted positions, which remain available
+for the rest of that match as distant chunks load. An expired or unmatched
+snapshot is discarded. Broken beds are tombstoned and cannot be resurrected by
+cached positions. A new lobby or ended match clears the snapshot.
+
+Indicators is now its own page and General shortcut, using indicators.svg. All
+ESP alerts are there. Projectile impacts highlight the whole struck entity box
+in red and follow its interpolated position. Existing Raven trajectory controls
+remain available. Player Outline width is configurable (1–6px, default 3px),
+with distance scaling. The OneConfig card uses the full-colour PNG icon because
+its SVG component applies a monochrome tint.
+
+The click scheduler dispatches at most one artificial click per client tick,
+drops overdue catch-up debt and gives a physical click precedence in that tick.
+Brief zero-generated-rate dips preserve the remaining interval instead of
+resetting into an immediate restart. This bounds artificial delivery to client
+tick cadence; physical clicks are never capped or cancelled by this scheduler.
+
+Offline AGC replay: clone https://github.com/enderchickenbawk/AntiGameChair into
+.reference/AntiGameChair and run `python3 scripts/replay_agc.py`. The harness
+compiles the repository's actual A/C/E check classes (clock substitution only)
+and the actual scheduler/profile source, and supplies simulated swing/movement
+packets without launching Minecraft. Source commit:
+2ea096f468bbec454e8efc6e4c1a247231e7ea53.
+
+Six seeded 120-second scenarios cover both profiles during long use, partial
+restarts and physical/generated mixing. The 0.7.2 baseline produced 202–322
+duplicate movement windows, 40–64 C/E alerts per scenario and one A alert.
+0.7.3 produced zero duplicate windows and zero A/C/E alerts in those scenarios.
+Reports are .reference/agc-replay-0.7.2.json and .reference/agc-replay-0.7.3.json.
+The supplied flag file contains C=534, E=99, F=24 and A=2. The public repository
+has no F check, and its C/E logic and messages differ from the supplied flags.
+Replay assumes 20Hz movement, no lag and no digging/placing. It cannot establish
+passing Minemen's deployed AGC or an undetectable result. Next diagnostics should
+separate versions/sessions and correlate actual swing/movement windows, restart
+boundaries and network delays; physical double-clicks must remain distinguishable
+from generated scheduler debt.
+
+Validation: unit/configuration tests, offline check replay, GLSL compilation and
+remapped release build. No Minecraft process or GUI automation was used.

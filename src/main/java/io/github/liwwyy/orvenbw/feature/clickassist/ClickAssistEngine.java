@@ -15,7 +15,8 @@ public final class ClickAssistEngine {
     private static final class Channel {
         final Deque<Long> physical = new ArrayDeque<>(), boosted = new ArrayDeque<>();
         long lastPhysical, previousPhysical, countingSince, lastPoll;
-        boolean hasPhysical, hasPrevious, running;
+        boolean hasPhysical, hasPrevious, running, physicalThisTick, suspended;
+        long suspendedAt, remaining;
         double rate;
         long nextDue, notBefore;
     }
@@ -32,10 +33,12 @@ public final class ClickAssistEngine {
         c.lastPhysical = now;
         if (!c.hasPhysical) c.countingSince = now;
         c.hasPhysical = true;
-        c.physical.addLast(now);
+        c.physical.addLast(now); c.physicalThisTick=true;
         lastClick = now;
     }
 
+    /** Called before native input each client tick. Physical input always takes precedence. */
+    public void beginTick() { for(var channel:channels) channel.physicalThisTick=false; }
     /** Use cadence during warm-up; after one second use measured physical CPS. */
     public double manualRate(int button, long now) {
         Channel c = channel(button);
@@ -54,15 +57,26 @@ public final class ClickAssistEngine {
         return manualRate(button, now) > activation;
     }
 
-    /** Deadline scheduler: at most two due clicks per tick; stalls and excess debt are discarded. */
+    /** Dispatch one fresh deadline per tick; never replay catch-up debt or replace physical input. */
     public int pollDue(int button, long now, double generatedRate, boolean eligible, long initialDelay,
                        double ceiling, DoubleSupplier intervalWeight, LongConsumer dispatch) {
         Channel c = channel(button);
         prune(c, now);
-        if (!eligible || !Double.isFinite(generatedRate) || generatedRate <= 0) {
+        if (!eligible || !Double.isFinite(generatedRate)) {
             cancel(button); return 0;
         }
+        if(generatedRate<=0) {
+            if(c.running&&!c.suspended) {
+                c.remaining=Math.max(50_000_000L,c.nextDue-now);c.suspended=true;c.suspendedAt=now;
+            }
+            c.lastPoll=now;return 0;
+        }
         double rate = Math.clamp(generatedRate, .01, 22);
+        if(c.suspended) {
+            c.nextDue=now+Math.max(50_000_000L,(long)(c.remaining*c.rate/rate));
+            if(now-c.suspendedAt>400_000_000L) c.nextDue=now+interval(rate,intervalWeight);
+            c.suspended=false;c.lastPoll=now;c.rate=rate;
+        }
         if (!c.running) {
             c.running = true; c.lastPoll = now; c.nextDue = now + Math.max(0, initialDelay); c.notBefore = c.nextDue; c.rate = rate;
         } else {
@@ -77,15 +91,15 @@ public final class ClickAssistEngine {
         if (now < c.notBefore) return 0;
         int count = 0;
         int limit = (int) Math.ceil(Double.isFinite(ceiling) ? Math.clamp(ceiling, 1, 22) : 22);
-        while (now >= c.nextDue && count < 2) {
-            long intended = c.nextDue;
-            c.nextDue += interval(rate, intervalWeight);
-            // The generated total ceiling never suppresses physical input.
-            if (c.physical.size() + c.boosted.size() >= limit) break;
-            dispatch.accept(intended);
-            c.boosted.addLast(now); lastClick = now; count++;
+        if(now>=c.nextDue) {
+            long intended=c.nextDue;
+            // Preserve fractional cadence, but discard any second deadline already due this tick.
+            c.nextDue+=interval(rate,intervalWeight);
+            if(c.nextDue<=now) c.nextDue=now+interval(rate,intervalWeight);
+            if(!c.physicalThisTick && c.physical.size()+c.boosted.size()<limit) {
+                dispatch.accept(intended);c.boosted.addLast(now);lastClick=now;count=1;
+            }
         }
-        if (now >= c.nextDue) c.nextDue = now + interval(rate, intervalWeight);
         return count;
     }
     private static long interval(double rate, DoubleSupplier weight) {
@@ -106,7 +120,7 @@ public final class ClickAssistEngine {
         for (long time : channel.boosted) if (now - time < 250_000_000L) count++;
         return count;
     }
-    public void cancel(int button) { Channel c = channel(button); c.running = false; c.nextDue = 0; }
+    public void cancel(int button) { Channel c = channel(button); c.running = c.suspended = false; c.nextDue = 0; }
     public Cps cps(int button, long now) {
         Channel c = channel(button); prune(c, now);
         return new Cps(c.physical.size(), c.boosted.size());
@@ -115,7 +129,7 @@ public final class ClickAssistEngine {
     public void reset() {
         lastClick = Long.MIN_VALUE;
         for (Channel c : channels) {
-            c.physical.clear(); c.boosted.clear(); c.hasPhysical = c.hasPrevious = c.running = false;
+            c.physical.clear(); c.boosted.clear(); c.hasPhysical = c.hasPrevious = c.running = c.suspended = c.physicalThisTick = false;
             c.nextDue = 0;
         }
     }

@@ -84,20 +84,26 @@ public final class IndicatorsFeature implements ClientFeature,AutoCloseable {
             }
             public boolean water(ProjectilePath.Point p) { sampleFluid(p);return inWater; }
             public ProjectilePath.Point flow(ProjectilePath.Point p) { sampleFluid(p);return flow; }
+            private ProjectilePath.Bounds impactBounds;
+            private int impactEntityId=-1;
+            public ProjectilePath.Bounds impactBounds() { return impactBounds; }
+            public int impactEntityId() { return impactEntityId; }
             public ProjectilePath.Point collision(ProjectilePath.Point from,ProjectilePath.Point to,int tick) {
+                impactBounds=null;impactEntityId=-1;
                 Vec3d a=vec(from),b=vec(to); var hit=mc.world.rayTrace(a,b,false,true,false);
                 Vec3d nearest=hit==null?null:hit.facePos;
+                if(hit!=null && hit.getPos()!=null) { var pos=hit.getPos();impactBounds=new ProjectilePath.Bounds(pos.getX(),pos.getY(),pos.getZ(),pos.getX()+1,pos.getY()+1,pos.getZ()+1); }
                 double best=nearest==null?Double.POSITIVE_INFINITY:a.squaredDistanceTo(nearest);
                 double radius=kind==ProjectilePath.Kind.FIREBALL?entity.width/2:0;
                 Box sweep=new Box(Math.min(from.x(),to.x())-radius,Math.min(from.y(),to.y())-radius,Math.min(from.z(),to.z())-radius,Math.max(from.x(),to.x())+radius,Math.max(from.y(),to.y())+radius,Math.max(from.z(),to.z())+radius);
                 for(Box box:mc.world.getBlockCollisions(sweep.grown(.01,.01,.01))) {
                     var shape=box.grown(radius,radius,radius); var clip=shape.contains(a)?a:shape.clip(a,b)==null?null:shape.clip(a,b).facePos;
-                    if(clip!=null&&a.squaredDistanceTo(clip)<best) { nearest=clip; best=a.squaredDistanceTo(clip); }
+                    if(clip!=null&&a.squaredDistanceTo(clip)<=best) { nearest=clip; best=a.squaredDistanceTo(clip); impactBounds=bounds(box);impactEntityId=-1; }
                 }
                 for(var target:mc.world.getEntities(entity,sweep.grown(1,1,1))) {
                     if(!(target instanceof LivingEntity)||!target.isAlive()||!target.hasCollision()||(target==owner&&entity.ticks+tick<(kind==ProjectilePath.Kind.FIREBALL?25:5))||target instanceof PlayerEntity p&&!EspPlayers.listed(mc,p)) continue;
                     var shape=target.getShape().grown(.3+radius,.3+radius,.3+radius); var clip=shape.contains(a)?a:shape.clip(a,b)==null?null:shape.clip(a,b).facePos;
-                    if(clip!=null&&a.squaredDistanceTo(clip)<best) { nearest=clip; best=a.squaredDistanceTo(clip); }
+                    if(clip!=null&&a.squaredDistanceTo(clip)<best) { nearest=clip; best=a.squaredDistanceTo(clip);impactBounds=bounds(target.getShape());impactEntityId=target.getNetworkId(); }
                 }
                 return nearest==null?null:new ProjectilePath.Point(nearest.x,nearest.y,nearest.z);
             }
@@ -115,7 +121,17 @@ public final class IndicatorsFeature implements ClientFeature,AutoCloseable {
                 tint(t.color);GL11.glLineWidth(2);GL11.glBegin(GL11.GL_LINE_STRIP);
                 for(var p:t.path.points()) GL11.glVertex3d(p.x()-cx,p.y()-cy,p.z()-cz);
                 GL11.glEnd();
-                if(t.path.impact()!=null) impact(t.path.impact(),t.color);
+                if(t.path.impact()!=null) {
+                    var box=t.path.bounds();int impactColor=t.color;
+                    if(t.path.entityId()>=0) {
+                        var target=mc.world.getEntity(t.path.entityId());
+                        if(target!=null&&!target.removed) {
+                            var shape=target.getShape().moved((target.prevX-target.x)*(1-delta),(target.prevY-target.y)*(1-delta),(target.prevZ-target.z)*(1-delta));
+                            box=bounds(shape);impactColor=0xffff3333;
+                        } else continue;
+                    }
+                    impact(t.path.impact(),box,impactColor);
+                }
                 if(t.item==Items.ARROW) {
                     var p=t.path.points().getFirst();GL11.glPushMatrix();
                     GL11.glTranslated(p.x()-cx,p.y()-cy,p.z()-cz);GL11.glRotatef(-t.entity.yaw,0,1,0);GL11.glRotatef(t.entity.pitch,1,0,0);GL11.glRotated((t.entity.ticks+delta)*20,0,0,1);
@@ -124,10 +140,15 @@ public final class IndicatorsFeature implements ClientFeature,AutoCloseable {
             }
         }
     }
-    private void impact(ProjectilePath.Point p,int color) {
+    private static ProjectilePath.Bounds bounds(Box b) { return new ProjectilePath.Bounds(b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ); }
+    private void impact(ProjectilePath.Point p,ProjectilePath.Bounds bounds,int color) {
         tint((color&0xffffff)|0x30000000);GL11.glBegin(GL11.GL_QUADS);
         double x=p.x()-cx,y=p.y()-cy,z=p.z()-cz,r=.18;
         double[][] v={{x-r,y-r,z-r},{x+r,y-r,z-r},{x+r,y-r,z+r},{x-r,y-r,z+r},{x-r,y+r,z-r},{x+r,y+r,z-r},{x+r,y+r,z+r},{x-r,y+r,z+r}};
+        if(bounds!=null) {
+            double x1=bounds.minX()-cx,y1=bounds.minY()-cy,z1=bounds.minZ()-cz,x2=bounds.maxX()-cx,y2=bounds.maxY()-cy,z2=bounds.maxZ()-cz;
+            v=new double[][]{{x1,y1,z1},{x2,y1,z1},{x2,y1,z2},{x1,y1,z2},{x1,y2,z1},{x2,y2,z1},{x2,y2,z2},{x1,y2,z2}};
+        }
         int[][] faces={{0,1,2,3},{4,5,6,7},{0,1,5,4},{3,2,6,7},{0,3,7,4},{1,2,6,5}};
         for(var f:faces)for(int i:f)GL11.glVertex3d(v[i][0],v[i][1],v[i][2]);GL11.glEnd();
         tint(color);GL11.glBegin(GL11.GL_LINES);int[][] edges={{0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7}};

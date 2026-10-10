@@ -32,6 +32,17 @@ class ProjectilePathTest {
         assertEquals(.014,path.points().get(4).x(),1e-9);
         assertEquals(.0392,path.points().get(8).x(),1e-9);
     }
+    @Test void entityImpactRetainsTheEntireHitboxAndIdentity() {
+        var bounds=new ProjectilePath.Bounds(-.3,0,-.3,.3,1.8,.3);
+        var path=ProjectilePath.predict(zero,new ProjectilePath.Point(3,0,0),zero,ProjectilePath.Kind.ARROW,new ProjectilePath.Environment() {
+            public boolean loaded(ProjectilePath.Point p){return true;}
+            public boolean water(ProjectilePath.Point p){return false;}
+            public ProjectilePath.Point collision(ProjectilePath.Point a,ProjectilePath.Point b,int tick){return b;}
+            public ProjectilePath.Bounds impactBounds(){return bounds;}
+            public int impactEntityId(){return 42;}
+        });
+        assertEquals(bounds,path.bounds());assertEquals(42,path.entityId());
+    }
     @Test void sweptCollisionStopsExactlyAtItsReportedPoint() {
         var hit=new ProjectilePath.Point(.5,0,0);
         var path=ProjectilePath.predict(zero,new ProjectilePath.Point(3,0,0),zero,ProjectilePath.Kind.PEARL,new ProjectilePath.Environment() {

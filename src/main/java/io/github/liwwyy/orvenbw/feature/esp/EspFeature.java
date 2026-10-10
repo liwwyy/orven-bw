@@ -28,7 +28,11 @@ public final class EspFeature implements ClientFeature {
     private final AlertTracker alerts = new AlertTracker();
     private final Set<Integer> flyingAlerts = new HashSet<>();
     private final EspDiagnostics diagnostics;
-    private final BedLayoutCache cache;
+    private final LobbyBedScout scout=new LobbyBedScout();
+    private final Map<BedGeometry.Pos,NearestLobbyWool> woolSearches=new LinkedHashMap<>();
+    private final Map<BedGeometry.Pos,Long> woolRetries=new HashMap<>();
+    private int lastRadius;
+    private boolean restored;
     private final Map<Long, WorldChunk> scanned = new HashMap<>();
     private final ArrayDeque<Scan> scans = new ArrayDeque<>();
     private final Set<Long> queued = new HashSet<>();
@@ -36,8 +40,8 @@ public final class EspFeature implements ClientFeature {
     private final Set<Integer> ownGolems = new HashSet<>();
     private Object world;
     private BedwarsSidebar.Phase phase = BedwarsSidebar.Phase.NONE;
-    private String map = "", server = "";
-    private int ticks, matchStart, teamCount;
+    private String map = "";
+    private int ticks;
     private boolean allowed, wasAlerts;
     private static final class Scan {
         final WorldChunk chunk; int section, offset;
@@ -47,7 +51,6 @@ public final class EspFeature implements ClientFeature {
     public EspFeature(OrvenConfig config) {
         this.config = config;
         diagnostics=new EspDiagnostics(FabricLoader.getInstance().getConfigDir().resolve("orven-bw/esp-debug.jsonl"),()->config.espDebug);
-        cache = new BedLayoutCache(FabricLoader.getInstance().getConfigDir().resolve("orven-bw/bed-layouts.json"));
         renderer = new EspRenderer(config);
     }
     public BedIndex index() { return index; }
@@ -55,49 +58,44 @@ public final class EspFeature implements ClientFeature {
     public boolean inMatch() { return phase == BedwarsSidebar.Phase.MATCH; }
     @Override public void tick(Minecraft mc) {
         ticks++;
-        if (world != mc.world) { reset(); world = mc.world; }
-        allowed = mc.world != null && mc.player != null && ScoreboardGate.allows(mc, config);
-        if (!allowed) { if (phase != BedwarsSidebar.Phase.NONE) clearMatch(); renderer.clearPlayers(); return; }
-        if (!config.bedAlertsEnabled && wasAlerts) { alerts.clear(); flyingAlerts.clear(); }
-        wasAlerts = config.bedAlertsEnabled;
-        if (!config.bedWaypointsEnabled && !config.bedAlertsEnabled) { clearMatch(); return; }
-        var sidebar = BedwarsSidebar.parse(sidebar(mc));
+        long now=System.nanoTime();
+        if(world!=mc.world) { worldChanged(now);world=mc.world; }
+        allowed=mc.world!=null&&mc.player!=null&&ScoreboardGate.allows(mc,config);
+        if(!config.modEnabled) { reset();return; }
+        if(!config.bedWaypointsEnabled&&!config.bedAlertsEnabled) { scout.clear();clearMatch();return; }
+        if(mc.world==null||mc.player==null) { scout.expire(now);return; }
+        if(!config.bedAlertsEnabled&&wasAlerts) { alerts.clear();flyingAlerts.clear(); }
+        wasAlerts=config.bedAlertsEnabled;
+        var sidebar=BedwarsSidebar.parse(sidebar(mc));
         diagnostics.record("scoreboard","phase="+sidebar.phase()+" lines="+sidebar(mc));
-        if (sidebar.phase() == BedwarsSidebar.Phase.NONE) { clearMatch(); return; }
-        if ((phase == BedwarsSidebar.Phase.MATCH && sidebar.phase() == BedwarsSidebar.Phase.LOBBY)
-                || !sidebar.map().isEmpty() && !map.isEmpty() && !map.equals(sidebar.map())) clearMatch();
-        if (phase != BedwarsSidebar.Phase.MATCH && sidebar.phase() == BedwarsSidebar.Phase.MATCH) matchStart = ticks;
-        phase = sidebar.phase();
-        if (!sidebar.map().isEmpty()) map = sidebar.map();
-        server = mc.getCurrentServerEntry() == null ? "local" : mc.getCurrentServerEntry().ip.toLowerCase(Locale.ROOT);
-        if (sidebar.teams() != 0) teamCount = sidebar.teams();
-        if(inMatch()) for (BedTeam team : sidebar.destroyed()) index.broken(team);
+        if(sidebar.phase()==BedwarsSidebar.Phase.LOBBY) {
+            if(phase!=BedwarsSidebar.Phase.LOBBY || !sidebar.map().equals(map)) { clearMatch();scout.beginLobby(); }
+        } else if(phase==BedwarsSidebar.Phase.LOBBY) {
+            scout.depart(now);clearMatch();
+        }
+        if(phase==BedwarsSidebar.Phase.MATCH && sidebar.phase()==BedwarsSidebar.Phase.NONE) { scout.clear();clearMatch(); }
+        phase=sidebar.phase();
+        if(phase==BedwarsSidebar.Phase.NONE) { scout.expire(now);return; }
+        if(!sidebar.map().isEmpty()) map=sidebar.map();
+        if(inMatch()&&!restored) {
+            if(scout.validate(now,g->matchesBed(mc,g))) {
+                for(var entry:scout.matchBeds()) index.assignScouted(entry.geometry(),entry.team());
+                restored=true;
+                diagnostics.record("lobby-scout-valid","At least one exact bed matches; retaining "+scout.matchBeds().size()+" scouted beds for this match");
+            } else if(!scout.pending()) diagnostics.record("lobby-scout-invalid","No lobby bed matched within 1.5 seconds; discarded transfer snapshot");
+        }
+        if(inMatch()) for(BedTeam team:sidebar.destroyed()) index.broken(team);
         if (ticks % 10 == 0) discover(mc);
         scan(mc, 16384); // At most four non-empty sections per tick, never full-world scans per frame.
         if (ticks % 4 == 0) {
             validateBeds(mc);
-            if (phase == BedwarsSidebar.Phase.MATCH && ticks - matchStart <= 300) associateTeams(mc);
-            if (teamCount == 0 && index.confirmedCount() == 8) teamCount = 8;
-            cache.learn(server, map, teamCount, index);
-            if (config.bedPredict) {
-                var layout = cache.match(server, map, teamCount, index.beds()).filter(l -> l.beds().stream().allMatch(e ->
-                        index.isDestroyed(e.geometry(), e.team()) || compatible(mc,e.geometry())));
-                if(layout.isEmpty()) diagnostics.record("layout-unmatched","No unique compatible cached layout: server="+server+" map="+map+" teamCount="+teamCount+" confirmedBeds="+index.confirmedCount()+" loadedChunks="+scanned.size());
-                index.discardPredictions();
-                layout.ifPresent(l -> { for (var entry : l.beds()) {
-                    var observed = index.beds().stream().filter(b -> b.geometry.equals(entry.geometry())).findFirst();
-                    if (observed.isPresent()) {
-                        if (!observed.get().teamObserved) observed.get().team = entry.team();
-                    } else index.predict(entry.geometry(), entry.team());
-                }});
-                validateBeds(mc);
-            } else index.discardPredictions();
+            if(phase==BedwarsSidebar.Phase.LOBBY) scoutWool(mc,now);
             index.updateDefence(p -> sample(mc,p));
             for(var bed:index.beds()) {
-                if(!bed.teamObserved) diagnostics.record("team:"+bed.geometry.foot(),"No confirmed spawn/team association: team="+bed.team+" confirmed="+bed.confirmed+" votes require slow tab-listed players near the bed during the first 15 seconds");
+                if(!bed.teamObserved) diagnostics.record("team:"+bed.geometry.foot(),"No unambiguous nearest lobby wool: team="+bed.team+" confirmed="+bed.confirmed);
                 diagnostics.record("defence:"+bed.geometry.foot(),"bed="+bed.geometry+" obsidian="+bed.count()+" samples="+bed.geometry.defence().stream().map(p->p+":"+sample(mc,p)).toList());
             }
-            if (config.bedAlertsEnabled && inMatch()) {
+            if (allowed && config.bedAlertsEnabled && inMatch()) {
                 playerAlerts(mc);
                 projectileAlerts(mc);
                 if (config.bedAlertPlacedObsidian) for (var bed : index.beds())
@@ -167,49 +165,58 @@ public final class EspFeature implements ClientFeature {
         if (!mc.world.isChunkLoaded(foot) || !mc.world.isChunkLoaded(head)
                 || !(mc.world.getBlockState(foot).getBlock() instanceof BedBlock)
                 || !(mc.world.getBlockState(head).getBlock() instanceof BedBlock)) return;
-        index.observe(new BedGeometry(pos(foot), head.getX() - foot.getX(), head.getZ() - foot.getZ()));
+        var geometry=new BedGeometry(pos(foot),head.getX()-foot.getX(),head.getZ()-foot.getZ());
+        var bed=index.observe(geometry);
+        if(bed!=null && phase==BedwarsSidebar.Phase.LOBBY) scout.observe(geometry,bed.team);
     }
     public void blockChanged(Minecraft mc, BlockPos pos) {
         if (!allowed || phase == BedwarsSidebar.Phase.NONE || mc.world == null) return;
         if (mc.world.getBlockState(pos).getBlock() instanceof BedBlock) observe(mc, pos);
-        else index.broken(pos(pos));
+        else {
+            if(phase==BedwarsSidebar.Phase.LOBBY) for(var bed:List.copyOf(index.beds())) if(bed.geometry.contains(pos(pos))) scout.remove(bed.geometry.foot());
+            index.broken(pos(pos));
+        }
         // Do not delay confirmation/removal until the next periodic scan.
         index.updateDefence(p -> sample(mc, p));
     }
-    private static boolean compatible(Minecraft mc, BedGeometry geometry) {
-        for (var p : List.of(geometry.foot(),geometry.head())) if (mc.world.isChunkLoaded(block(p))) {
-            var state = mc.world.getBlockState(block(p));
-            if (!(state.getBlock() instanceof BedBlock)) return false;
-            var facing = state.get(HorizontalFacingBlock.FACING);
-            var expected = block(geometry.foot()).offset(facing);
-            if (!expected.equals(block(geometry.head()))) return false;
-        }
-        return true;
+    private static boolean matchesBed(Minecraft mc,BedGeometry geometry) {
+        if(!mc.world.isChunkLoaded(block(geometry.foot()))||!mc.world.isChunkLoaded(block(geometry.head()))) return false;
+        var foot=mc.world.getBlockState(block(geometry.foot()));var head=mc.world.getBlockState(block(geometry.head()));
+        return foot.getBlock() instanceof BedBlock && head.getBlock() instanceof BedBlock
+                && foot.get(BedBlock.PART)==BedBlock.Part.FOOT && head.get(BedBlock.PART)==BedBlock.Part.HEAD
+                && block(geometry.foot()).offset(foot.get(HorizontalFacingBlock.FACING)).equals(block(geometry.head()));
     }
     private void validateBeds(Minecraft mc) {
         for (var bed : List.copyOf(index.beds())) {
             var geometry = bed.geometry;
             for (var p : List.of(geometry.foot(), geometry.head())) if (mc.world.isChunkLoaded(block(p))) {
-                if (!(mc.world.getBlockState(block(p)).getBlock() instanceof BedBlock)) { index.broken(p); break; }
+                if (!(mc.world.getBlockState(block(p)).getBlock() instanceof BedBlock)) { if(phase==BedwarsSidebar.Phase.LOBBY) scout.remove(geometry.foot());index.broken(p);break; }
                 if (mc.world.isChunkLoaded(block(geometry.foot())) && mc.world.isChunkLoaded(block(geometry.head()))) observe(mc, block(p));
             }
         }
     }
-    private void associateTeams(Minecraft mc) {
-        for (PlayerEntity player : mc.world.players) {
-            if (!player.isAlive() || player.isSpectator() || !EspPlayers.listed(mc, player)) continue;
-            BedTeam team = BedTeam.fromColor(EspPlayers.color(player));
-            if (team == BedTeam.UNKNOWN) { diagnostics.record("team-colour:"+player.getName(),"No usable team/nametag colour; player="+player.getName()+" team="+player.getScoreboardTeam()); continue; }
-            // Only slow, early spawn observations near a base. A rushing opponent cannot relabel a bed.
-            if (Math.hypot(player.x - player.prevX, player.z - player.prevZ) > .35) continue;
-            var nearby = index.beds().stream().filter(b -> b.confirmed && Math.abs(player.y - b.geometry.y()) < 5)
-                    .sorted(Comparator.comparingDouble(b -> b.geometry.distanceSquared(player.x, player.y, player.z))).toList();
-            if (nearby.isEmpty()) continue;
-            var bed = nearby.getFirst(); double distance = bed.geometry.distanceSquared(player.x, player.y, player.z);
-            if (distance > 144 || nearby.size() > 1 && nearby.get(1).geometry.distanceSquared(player.x, player.y, player.z) < distance * 2) continue;
-            index.vote(bed, team, player.getName());
+    private void scoutWool(Minecraft mc,long now) {
+        int radius=Math.clamp(config.bedWoolRadius,1,32);
+        if(radius!=lastRadius) { woolSearches.clear();woolRetries.clear();lastRadius=radius; }
+        for(var bed:index.beds()) if(now>=woolRetries.getOrDefault(bed.geometry.foot(),0L))
+            woolSearches.computeIfAbsent(bed.geometry.foot(),p->new NearestLobbyWool(bed.geometry,radius));
+        int budget=8192;
+        for(var entry:List.copyOf(woolSearches.entrySet())) {
+            if(budget<=0) break;
+            var search=entry.getValue();
+            budget-=search.scan(Math.min(2048,budget),p->{
+                if(!mc.world.isChunkLoaded(block(p))) return -2;
+                var state=mc.world.getBlockState(block(p));
+                return state.getBlock()==Blocks.WOOL?state.get(ColoredBlock.COLOR).getId():-1;
+            });
+            if(!search.complete()) continue;
+            var bed=index.beds().stream().filter(b->b.geometry.foot().equals(entry.getKey())).findFirst().orElse(null);
+            if(bed!=null) {
+                index.assignScouted(bed.geometry,search.team());scout.observe(bed.geometry,search.team());
+                diagnostics.record("wool:"+entry.getKey(),"team="+search.team()+" conflicting="+search.conflict()+" unloadedNearer="+search.unknown()+" radius="+radius);
+            }
+            woolSearches.remove(entry.getKey());woolRetries.put(entry.getKey(),now+1_000_000_000L);
         }
-        index.resolveTeams();
     }
     private static int sample(Minecraft mc, BedGeometry.Pos p) {
         return !mc.world.isChunkLoaded(block(p)) ? -1 : mc.world.getBlockState(block(p)).getBlock() == Blocks.OBSIDIAN ? 1 : 0;
@@ -272,9 +279,14 @@ public final class EspFeature implements ClientFeature {
     public void renderHud(Minecraft mc) {
         if (allowed && mc.world == world && ScoreboardGate.allows(mc,config) && mc.screen == null && !mc.options.hideGui && !mc.isPaused()) renderer.renderHud(mc, index, phase != BedwarsSidebar.Phase.NONE);
     }
-    private void clearMatch() { index.clear(); alerts.clear(); flyingAlerts.clear(); scanned.clear(); scans.clear(); queued.clear(); eggs.clear(); ownGolems.clear(); map = ""; teamCount = 0; phase = BedwarsSidebar.Phase.NONE; }
-    @Override public void contextLost(boolean worldChanged) { renderer.clearFrame(); if (worldChanged) reset(); }
-    @Override public void reset() { clearMatch(); renderer.clearPlayers(); allowed = false; }
+    private void clearMatch() { index.clear(); alerts.clear(); flyingAlerts.clear(); scanned.clear(); scans.clear(); queued.clear(); eggs.clear(); ownGolems.clear(); map = ""; restored=false;woolSearches.clear();woolRetries.clear();phase = BedwarsSidebar.Phase.NONE; }
+    @Override public void contextLost(boolean worldChanged) { renderer.clearFrame(); if (worldChanged) worldChanged(System.nanoTime()); }
+    private void worldChanged(long now) {
+        if(phase==BedwarsSidebar.Phase.LOBBY) scout.depart(now);
+        else if(inMatch()) scout.clear();
+        clearMatch();renderer.clearPlayers();allowed=false;
+    }
+    @Override public void reset() { scout.clear();clearMatch();renderer.clearPlayers();allowed=false; }
     public void close() { renderer.close(); }
     public static BedGeometry.Pos pos(BlockPos p) { return new BedGeometry.Pos(p.getX(), p.getY(), p.getZ()); }
     public static BlockPos block(BedGeometry.Pos p) { return new BlockPos(p.x(), p.y(), p.z()); }

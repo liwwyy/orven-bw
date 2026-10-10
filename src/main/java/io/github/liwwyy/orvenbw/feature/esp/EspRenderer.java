@@ -121,7 +121,7 @@ public final class EspRenderer implements AutoCloseable {
                     box(p.x()-cameraX,p.y()-cameraY,p.z()-cameraZ,p.x()+1-cameraX,p.y()+1-cameraY,p.z()+1-cameraZ,0xff6a0dad,false);
             }
         }
-        if (config.playerEspEnabled && style(2)) outline.render(mc,delta,players,this::color,config.espShowInvisible,config.espOccludedOnly,projection);
+        if (config.playerEspEnabled && style(2)) outline.render(mc,delta,players,this::color,config.espShowInvisible,config.espOccludedOnly,projection,config.espOutlineWidth);
         else outline.close();
     }
     private void captureBounds(PlayerEntity player,double x1,double y1,double z1,double x2,double y2,double z2,int color) {
@@ -229,7 +229,7 @@ public final class EspRenderer implements AutoCloseable {
         } finally { GL11.glPopMatrix(); }
     }
     private void label(Minecraft mc, BedIndex.Bed bed) {
-        String title = bed.team.initial() + (bed.confirmed && (bed.teamObserved || bed.team == BedTeam.UNKNOWN) ? "" : "?");
+        String title = bed.team.initial() + (bed.teamObserved || (bed.confirmed && bed.team == BedTeam.UNKNOWN) ? "" : "?");
         int width = mc.textRenderer.getWidth(title);
         GlStateManager.enableTexture(); GlStateManager.enableBlend(); GlStateManager.disableDepthTest(); GlStateManager.depthMask(false);
         GuiElement.fill(-width/2-3,-3,width/2+3,10,0xaa151515);

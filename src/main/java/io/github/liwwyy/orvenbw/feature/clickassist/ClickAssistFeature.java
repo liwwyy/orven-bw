@@ -60,6 +60,7 @@ public final class ClickAssistFeature implements ClientFeature {
         if (keyCode == useCode) engine.physicalClick(1, now);
     }
 
+    @Override public void tick(Minecraft mc) { engine.beginTick(); }
     @Override public void beforeInteractions(Minecraft mc) {
         syncBindings(mc);
         client = mc;

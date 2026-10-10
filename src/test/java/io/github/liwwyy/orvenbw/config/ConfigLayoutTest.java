@@ -17,6 +17,8 @@ class ConfigLayoutTest {
         assertNull(tree.get("modEnabled").getMetadata("hidden"));
         assertEquals("assets/orvenbw/icons/clickassist.svg", tree.get("openClickAssist").getMetadata("icon"));
         assertNotNull(tree.get("openClickAssist").getMetadata("runnable"));
+        assertEquals("assets/orvenbw/icons/icon.png",tree.getMetadata("mod_card_icon_path"));
+        assertEquals("assets/orvenbw/icons/indicators.svg",tree.get("openIndicators").getMetadata("icon"));
         assertNotNull(getClass().getClassLoader().getResource("assets/orvenbw/icons/clickassist.svg"));
         assertEquals("Only enables the mod if these conditions are met", tree.get("conditionsInfo").description);
         assertArrayEquals(new int[]{InputConstants.KEY_P}, config.settingsBind.getKeyCodes());
@@ -31,13 +33,17 @@ class ConfigLayoutTest {
             categories.add(node.getMetadata("category"));
             if ("ClickAssist".equals(node.getMetadata("category"))) sections.add(node.getMetadata("subcategory"));
         }
-        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup", "ESP"), java.util.List.copyOf(categories));
-        assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "AutoBlock", "Indicators", "Advanced", "HUD"), java.util.List.copyOf(sections));
+        assertEquals(java.util.List.of("General", "ClickAssist", "AutoTool", "AutoSoup", "ESP", "Indicators"), java.util.List.copyOf(categories));
+        assertEquals(java.util.List.of("Physical CPS Boost", "Spam click button", "Mouse button hold click", "Button Hold", "Hit effects", "AutoBlock", "Advanced", "HUD"), java.util.List.copyOf(sections));
         for (String field : new String[]{"enabled", "leftClick", "rightClick", "spamEnabled", "spamLeftBind", "spamRightBind"}) {
             assertNotNull(tree.get(field).getMetadata("visualizer"), field);
             assertNull(tree.get(field).getMetadata("hidden"), field);
         }
         assertNotNull(tree.get("heldFilters", "heldClickEnabled"));
+        assertEquals("Indicators",tree.get("bedWarningSound").getMetadata("category"));
+        assertEquals("Indicators",tree.get("bedWarnings").getMetadata("category"));
+        assertEquals(16,new OrvenConfig().bedWoolRadius);
+        assertEquals(3f,new OrvenConfig().espOutlineWidth);
     }
     @Test void everyVisibleControlHasANameAndDescriptionAndAccordionsRender() {
         Tree tree = tree(new OrvenConfig());
